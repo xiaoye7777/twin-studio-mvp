@@ -1,6 +1,6 @@
 /*
- * 算出一个节点的面板此刻要显示什么：模板决定字段，实例决定覆盖，设备绑定提供数值。
- * 编辑器的预览和 Viewer SDK 都用它，再由同一个面板组件画出来。
+ * 算出一个面板此刻要显示什么：标签组的模板决定字段，面板自己的覆盖决定标题和隐藏项，设备绑定提供数值。
+ * 编辑器和 Viewer SDK 都用它，再由 PanelObject 画出来。
  */
 import type { SceneDocumentV2, SceneNodeV2 } from '../../domain/scene'
 import { targetForNode, type TwinBinding, type TwinRuntimeValue } from '../../domain/twin'
@@ -14,10 +14,10 @@ export interface PanelRow {
 }
 
 export interface PanelView {
-  instanceId: string
-  templateId: string
   nodeId: string
   title: string
+  /** 面板宽度（米）。 */
+  width: number
   rows: PanelRow[]
 }
 
@@ -27,30 +27,25 @@ export interface PanelDataReader {
   getRuntimeValue(bindingId: string, variableKey: string): TwinRuntimeValue | null
 }
 
-/** 这个节点挂的面板实例；节点自己没有就看外层分组（给分组挂一个，里面的模型共用）。 */
-export function panelInstanceFor(document: SceneDocumentV2, nodeId: string) {
-  const byId = new Map(document.nodes.map(node => [node.id, node]))
-  for (let node: SceneNodeV2 | undefined = byId.get(nodeId); node; node = byId.get(node.parentId ?? '')) {
-    const instance = document.panels.find(item => item.nodeId === node!.id)
-    if (instance) return instance
-  }
-  return null
+/** 设备绑在哪个节点上：面板关联了对象时是那个对象，其他情况都是节点自己。 */
+export function dataOwnerOf(document: SceneDocumentV2, node: SceneNodeV2): SceneNodeV2 {
+  if (node.kind !== 'panel' || !node.panel.targetNodeId) return node
+  return document.nodes.find(item => item.id === node.panel.targetNodeId) ?? node
 }
 
 export function resolvePanel(document: SceneDocumentV2, data: PanelDataReader, nodeId: string): PanelView | null {
-  const instance = panelInstanceFor(document, nodeId)
-  if (!instance) return null
-  const template = document.panelTemplates.find(item => item.id === instance.templateId)
-  const owner = document.nodes.find(node => node.id === instance.nodeId)
-  if (!template || !owner) return null
+  const node = document.nodes.find(item => item.id === nodeId)
+  if (node?.kind !== 'panel') return null
+  const group = document.nodes.find(item => item.id === node.parentId)
+  if (group?.kind !== 'panel-group') return null
+  const owner = dataOwnerOf(document, node)
   const binding = data.getBindingByTarget(targetForNode(owner))
-  const hidden = new Set(instance.hiddenFields ?? [])
+  const hidden = new Set(node.panel.hiddenFields ?? [])
   return {
-    instanceId: instance.id,
-    templateId: template.id,
-    nodeId: owner.id,
-    title: instance.title ?? (template.title || binding?.device.name || owner.name),
-    rows: template.fields
+    nodeId: node.id,
+    title: node.panel.title ?? (group.template.title || binding?.device.name || owner.name),
+    width: group.template.width,
+    rows: group.template.fields
       .filter(field => !hidden.has(field.id))
       .map(field => {
         const live = binding ? data.getRuntimeValue(binding.id, field.variableKey) : null

@@ -74,6 +74,35 @@ describe('HttpPollingDataSource', () => {
     expect(r.statuses.at(-1)).toBe('disconnected')
   })
 
+  it('requests once when polling is off, and repeats when it is on', async () => {
+    vi.useFakeTimers()
+    try {
+      const fetch = vi.fn(async () => new Response(JSON.stringify([{ deviceId: 'ESS-001', soc: 64 }])))
+      vi.stubGlobal('fetch', fetch)
+      const options = {
+        url: '/api/latest',
+        method: 'GET',
+        interval: 1,
+        resultPath: '',
+        withCredentials: false,
+      } as const
+      const once = new HttpPollingDataSource({ ...recorder().options, ...options, polling: false })
+      once.start()
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(fetch).toHaveBeenCalledTimes(1)
+      once.stop()
+
+      fetch.mockClear()
+      const repeating = new HttpPollingDataSource({ ...recorder().options, ...options })
+      repeating.start()
+      await vi.advanceTimersByTimeAsync(3500)
+      expect(fetch.mock.calls.length).toBeGreaterThan(2)
+      repeating.stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('posts the subscribe message when the body is empty', async () => {
     const fetch = vi.fn(async (_url: string, _init?: RequestInit) => new Response('[]'))
     vi.stubGlobal('fetch', fetch)

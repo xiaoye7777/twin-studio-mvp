@@ -1,5 +1,5 @@
 /*
- * 定时请求一个 HTTP 接口取设备数据。请求怎么拼（参数、请求头、请求体、认证）在 buildHttpRequest，
+ * 请求一个 HTTP 接口取设备数据。请求怎么拼（参数、请求头、请求体、认证）在 buildHttpRequest，
  * 轮询和「试请求」（probeDataSource）用同一份，保证试出来的结果和实际运行一致。
  */
 import type { HttpDataSourceConfig, SourceMapping } from '../../domain/dataSources'
@@ -10,7 +10,7 @@ import { subscriptionMessage } from './WebSocketDataSource'
 
 /** 发一次请求需要的配置。 */
 export type HttpRequestConfig = Pick<HttpDataSourceConfig, 'url' | 'method' | 'withCredentials'> &
-  Partial<Pick<HttpDataSourceConfig, 'params' | 'headers' | 'body' | 'envelope' | 'timeout' | 'interval'>>
+  Partial<Pick<HttpDataSourceConfig, 'params' | 'headers' | 'body' | 'envelope' | 'timeout' | 'interval' | 'polling'>>
 
 export interface HttpPollingDataSourceOptions extends HttpRequestConfig {
   /** 秒。 */
@@ -102,8 +102,8 @@ export function httpErrorMessage(error: unknown, timedOut: boolean, timeout: num
 }
 
 /**
- * 定时轮询：每次成功就更新数值；失败时清空数值并报告原因（和 WebSocket 断开时一样，屏幕上不会留着
- * 过期的值），下一次照常重试。
+ * 请求接口取数据：每次成功就更新数值；失败时清空数值并报告原因（和 WebSocket 断开时一样，屏幕上不会留着
+ * 过期的值）。打开定时请求时按间隔重复，下一次照常重试；关闭时（polling 为 false）只请求一次。
  */
 export class HttpPollingDataSource implements DataSource {
   private timer: ReturnType<typeof setTimeout> | null = null
@@ -124,7 +124,8 @@ export class HttpPollingDataSource implements DataSource {
     const { options } = this
     const controller = new AbortController()
     this.controller = controller
-    const seconds = options.timeout ?? Math.min(options.interval, 15)
+    const polling = options.polling !== false
+    const seconds = options.timeout ?? (polling ? Math.min(options.interval, 15) : 15)
     let timedOut = false
     const timeout = setTimeout(() => {
       timedOut = true
@@ -147,7 +148,7 @@ export class HttpPollingDataSource implements DataSource {
     } finally {
       clearTimeout(timeout)
     }
-    if (this.running) this.timer = setTimeout(() => void this.poll(), options.interval * 1000)
+    if (this.running && polling) this.timer = setTimeout(() => void this.poll(), options.interval * 1000)
   }
 
   stop(): void {

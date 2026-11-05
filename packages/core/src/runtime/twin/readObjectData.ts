@@ -8,9 +8,12 @@ export interface ObjectDataReader {
   getRuntimeValue(bindingId: string, variableKey: string): TwinRuntimeValue | null
 }
 
-/** 一个节点的数据：节点信息、绑定的设备、每个变量的当前值。 */
-export function readObjectData(node: SceneNodeV2, data: ObjectDataReader): ViewerObjectData {
-  const binding = data.getBindingByTarget(targetForNode(node))
+/**
+ * 一个节点的数据：节点信息、绑定的设备、每个变量的当前值。
+ * owner 是设备绑在哪个节点上，默认是节点自己；关联了对象的面板，设备在被关联的对象上。
+ */
+export function readObjectData(node: SceneNodeV2, data: ObjectDataReader, owner = node): ViewerObjectData {
+  const binding = data.getBindingByTarget(targetForNode(owner))
   return {
     nodeId: node.id,
     name: node.name,

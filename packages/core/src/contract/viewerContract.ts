@@ -15,6 +15,7 @@ import type {
   TwinRuntimeValue,
   TwinRuntimeValueData,
 } from '../domain/twin'
+import type { SceneNodeV2 } from '../domain/scene'
 import type { DataSourceConnectionStatus, DataSourceRuntimeState, DataSourceType } from '../infrastructure/data'
 
 export type { TwinBindingTarget } from '../domain/twin'
@@ -40,7 +41,7 @@ export interface ViewerObjectValue {
 export interface ViewerObjectData {
   nodeId: string
   name: string
-  kind: 'model' | 'group'
+  kind: SceneNodeV2['kind']
   device: TwinDevice | null
   bindingId: string | null
   values: ViewerObjectValue[]

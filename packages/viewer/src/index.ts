@@ -1,12 +1,11 @@
 export { default as TwinSceneViewer } from './components/TwinSceneViewer.vue'
-export { default as TwinPanelCard } from './components/TwinPanelCard.vue'
-export { loadTwinPackage, SCENE_DOCUMENT_VERSION } from '@twin-studio/core'
+export { loadSceneDocument, SCENE_DOCUMENT_VERSION } from '@twin-studio/core'
 export type {
+  AssetResolver,
   CameraBookmark,
   CameraViewV2,
   DataSourceConnectionStatus,
   DataSourceType,
-  LoadedTwinPackage,
   PanelInstance,
   PanelTemplate,
   ProjectDataSource,
@@ -16,7 +15,6 @@ export type {
   TwinBinding,
   TwinBindingTarget,
   TwinDevice,
-  TwinPackageSource,
   TwinRuntimeValue,
   TwinSceneViewerEvents,
   TwinSceneViewerPublicApi,

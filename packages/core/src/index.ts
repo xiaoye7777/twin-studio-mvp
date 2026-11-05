@@ -7,12 +7,9 @@ export * from './domain/panels'
 export * from './contract/viewerContract'
 
 export * from './infrastructure/assets/AssetRepository'
+export * from './infrastructure/assets/UrlAssetRepository'
 export * from './infrastructure/scenes/SceneRepository'
 export * from './infrastructure/data'
-export * from './infrastructure/packages/packageFormat'
-export * from './infrastructure/packages/packageZip'
-export * from './infrastructure/packages/validatePortableAsset'
-export * from './infrastructure/packages/PortableTwinPackageLoader'
 
 export * from './runtime/scene/objectMetadata'
 export * from './runtime/scene/ImportedAssetResourceRegistry'
@@ -26,7 +23,8 @@ export * from './runtime/twin/viewerRuntimeState'
 export * from './runtime/twin/readObjectData'
 export * from './runtime/twin/formatValue'
 export * from './runtime/panels/resolvePanel'
-export * from './runtime/panels/PanelTracker'
+export * from './runtime/panels/PanelObject'
+export * from './runtime/panels/PanelLayer'
 
 export * from './engine'
 

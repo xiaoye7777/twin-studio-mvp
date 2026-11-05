@@ -13,7 +13,7 @@
 | GET | `/projects` | 场景列表 |
 | POST | `/projects` | 新建场景 |
 | GET | `/projects/{projectId}` | 取一个场景的信息 |
-| PATCH | `/projects/{projectId}` | 重命名 |
+| PATCH | `/projects/{projectId}` | 改标题和描述 |
 | DELETE | `/projects/{projectId}` | 删除 |
 | PUT | `/projects/{projectId}/cover` | 上传封面 |
 | GET | `/projects/{projectId}/cover` | 读取封面 |
@@ -58,14 +58,15 @@ JSON 接口都用下面的包装，`code` 为 `0` 表示成功。HTTP 状态码�
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `id` | string | 后端生成 |
-| `name` | string | 2～40 个字符 |
+| `name` | string | 标题，2～40 个字符 |
+| `description` | string | 描述，最多 200 个字符，可以为空 |
 | `coverUrl` | string \| null | 封面地址，没有时为 `null` |
 | `createdAt` | string | 创建时间 |
-| `updatedAt` | string | 保存场景和重命名时更新，上传封面时**不**更新 |
+| `updatedAt` | string | 保存场景和改信息时更新，上传封面时**不**更新 |
 
 - `GET /projects`：返回数组，按 `createdAt` 升序。
-- `POST /projects`：请求 `{ "name": "新场景" }`，返回场景信息。后端不用创建默认场景。
-- `PATCH /projects/{projectId}`：请求 `{ "name": "新名字" }`，返回场景信息。
+- `POST /projects`：请求 `{ "name": "新场景", "description": "这个场景是做什么的" }`，返回场景信息。后端不用创建默认场景。
+- `PATCH /projects/{projectId}`：请求 `{ "name": "新标题", "description": "新描述" }`，只改传了的字段，返回场景信息。
 - `DELETE /projects/{projectId}`：删除场景数据和封面，**不删除模型文件**，模型可能被别的场景使用。
 - `PUT /projects/{projectId}/cover`：请求体是图片本身（`Content-Type: image/jpeg`），返回 `{ "coverUrl": "..." }`。前端每次保存后上传一次。
 
@@ -73,7 +74,7 @@ JSON 接口都用下面的包装，`code` 为 `0` 表示成功。HTTP 状态码�
 
 **核心思路：** 模型文件先单独上传拿到 `assetId`，场景 JSON 里只记 `assetId`。保存场景只传 JSON，读取时再按 `assetId` 下载文件。
 
-后端把 JSON 原样存、原样返回，不需要读懂节点结构。
+后端把 JSON 原样存、原样返回，不需要读懂节点结构。数据大屏也走同一条路：取到这份 JSON 交给 Viewer SDK，SDK 再按 `assetId` 要模型文件。**没有压缩包，只有 JSON + 资源 ID 这一种格式。**
 
 ### 4.1 `GET /projects/{projectId}/scene`
 
@@ -129,7 +130,7 @@ JSON 接口都用下面的包装，`code` 为 `0` 表示成功。HTTP 状态码�
 - **不要改写 `document`。** 保存什么就返回什么，`nodes` 等数组的顺序有含义。
 - **不要因为模型不存在而拒绝保存。** 前端能打开缺模型的场景并给出提示。
 - **不要严格校验未知字段。** 前端加字段时后端不用跟着升级。
-- **不要往 `document` 里写账号、密码或 Token。** 场景文件会随项目包分发。
+- **不要往 `document` 里写账号、密码或 Token。** 这份 JSON 会交给数据大屏，浏览器里都看得到。
 
 ### 4.3 版本冲突
 
@@ -161,7 +162,7 @@ JSON 接口都用下面的包装，`code` 为 `0` 表示成功。HTTP 状态码�
 | `mimeType` | string | `model/gltf-binary` |
 | `size` | number | 字节数 |
 | `sha256` | string | 后端计算 |
-| `lastModified` | number | 文件修改时间（毫秒时间戳），导出项目包时要用 |
+| `lastModified` | number | 文件修改时间（毫秒时间戳），只是记录 |
 | `createdAt` | string | 上传时间 |
 
 ### 5.1 `POST /assets`
@@ -184,7 +185,7 @@ JSON 接口都用下面的包装，`code` 为 `0` 表示成功。HTTP 状态码�
 
 - `GET /assets`：返回资源数组，按 `createdAt` 降序。
 - `GET /assets/{assetId}`：返回资源信息。
-- `GET /assets/{assetId}/content`：返回文件内容，带 `Content-Type`、`Content-Length`，并且建议 `Cache-Control: private, max-age=31536000, immutable`（同一个 `assetId` 的内容永远不变）。打开场景时会同时请求所有用到的模型，要支持并发。
+- `GET /assets/{assetId}/content`：返回文件内容，带 `Content-Type`、`Content-Length`，并且建议 `Cache-Control: private, max-age=31536000, immutable`（同一个 `assetId` 的内容永远不变）。打开场景时会同时请求所有用到的模型，要支持并发。数据大屏和后端不同域时，这个接口要配 CORS。
 
 ### 5.3 查询引用和删除
 
@@ -211,7 +212,7 @@ VITE_API_BASE=https://后端地址/api/v1
 | 方式 | 说明 |
 | --- | --- |
 | WebSocket | 连接后前端发一条订阅消息，列出设备和变量；后端推送 JSON 文本帧。断开后按 1、2、4、8、10 秒退避重连 |
-| HTTP 定时请求 | 按配置的间隔请求（默认 5 秒），`结果位置`填设备数据在返回值里的路径，如 `data` |
+| HTTP | 默认打开场景时只请求一次；打开「定时请求」后按间隔重复（默认 5 秒）。`数据位置`填设备数据在返回值里的路径，如 `data` |
 | 静态数据 | 在编辑器里手填，不需要后端 |
 
 默认的数据格式是每条一台设备，字段名就是变量名：
@@ -225,7 +226,7 @@ VITE_API_BASE=https://后端地址/api/v1
 - 接口断开或请求失败时，前端清空这个接口提供的值，不留过期数据。
 - **数值只能来自真实数据。** 前端不会生成或补全数据，后端也不要用默认值填充没有采集到的变量。
 - **跨域：** 浏览器直连，所以跨域部署时后端要配 CORS。HTTPS 页面只能连 `wss://` 和 `https://`。
-- **不能带密钥：** 地址和参数不能带 Token，因为配置会随项目包分发。需要认证的 HTTP 接口由使用 Viewer SDK 的一方通过 `data-request-headers` 提供。
+- **不能带密钥：** 地址和参数不能带 Token，因为配置在场景 JSON 里。需要认证的 HTTP 接口由使用 Viewer SDK 的一方通过 `data-request-headers` 提供。
 
 ## 附录：场景文档示例
 
@@ -254,6 +255,31 @@ VITE_API_BASE=https://后端地址/api/v1
       "locked": false,
       "transform": { "position": [0, 0, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
       "model": { "assetId": "asset_01" }
+    },
+    {
+      "id": "panels_01",
+      "parentId": null,
+      "name": "标签组",
+      "kind": "panel-group",
+      "visible": true,
+      "locked": false,
+      "transform": { "position": [0, 0, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+      "template": {
+        "title": "",
+        "width": 3,
+        "trigger": "always",
+        "fields": [{ "id": "field_01", "label": "电量", "variableKey": "soc", "unit": "%", "dataType": "number" }]
+      }
+    },
+    {
+      "id": "panel_01",
+      "parentId": "panels_01",
+      "name": "1 号储能柜 面板",
+      "kind": "panel",
+      "visible": true,
+      "locked": false,
+      "transform": { "position": [0, 2.4, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1] },
+      "panel": { "targetNodeId": "instance_01" }
     }
   ],
   "bindings": [
@@ -271,15 +297,6 @@ VITE_API_BASE=https://后端地址/api/v1
       "view": { "position": [60, 45, 60], "target": [0, 0, 0] },
       "thumbnail": "data:image/jpeg;base64,..."
     }
-  ],
-  "panelTemplates": [
-    {
-      "id": "template_01",
-      "name": "储能柜",
-      "title": "",
-      "fields": [{ "id": "field_01", "label": "电量", "variableKey": "soc", "unit": "%" }]
-    }
-  ],
-  "panels": [{ "id": "panel_01", "templateId": "template_01", "nodeId": "instance_01" }]
+  ]
 }
 ```

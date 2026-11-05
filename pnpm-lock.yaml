@@ -43,9 +43,6 @@ importers:
       '@twin-studio/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@twin-studio/viewer':
-        specifier: workspace:*
-        version: link:../../packages/viewer
       element-plus:
         specifier: 2.11.8
         version: 2.11.8(vue@3.5.25(typescript@5.9.3))
@@ -95,9 +92,6 @@ importers:
       camera-controls:
         specifier: 2.10.1
         version: 2.10.1(three@0.184.0)
-      fflate:
-        specifier: 0.8.3
-        version: 0.8.3
       immer:
         specifier: 11.1.18
         version: 11.1.18

@@ -1,5 +1,5 @@
 import { reactive, shallowRef } from 'vue'
-import type { Matrix4 } from 'three'
+import { Box3, type Matrix4, Vector3 } from 'three'
 import {
   type AssetRepository,
   BindingTargetResolver,
@@ -11,9 +11,7 @@ import {
   isLockedOrHidden,
   loadSceneDocument,
   nodeById,
-  type PanelAnchor,
-  PanelTracker,
-  resolvePanel,
+  PanelLayer,
   type SceneDocumentV2,
   type SceneNodeV2,
   type SceneRepository,
@@ -37,6 +35,9 @@ import { type GizmoMode, TransformGizmo } from './TransformGizmo'
 
 export type SaveState = 'saved' | 'unsaved' | 'saving' | 'error'
 
+/** 视口左侧快捷栏的工具。select 只选中，不显示变换手柄。 */
+export type EditorTool = 'select' | GizmoMode
+
 /** 场景仓库，加上选择「覆盖别人的修改」时要用的方法。 */
 export interface EditorSceneRepository extends SceneRepository {
   overwrite(document: SceneDocumentV2, currentRevision: number): Promise<void>
@@ -58,7 +59,7 @@ export interface EditorSessionDeps {
  * 三维对象从不被直接修改。
  *
  * 这个类只放核心：生命周期、文档与撤销、保存、选择、预览模式。其余功能按主题分在 `session/` 下，
- * 通过字段访问，例如 `session.nodes.addModel()`、`session.panels.addTemplate()`。
+ * 通过字段访问，例如 `session.nodes.addModel()`、`session.panels.addGroup()`。
  */
 export class EditorSession {
   readonly engine: TwinEngine
@@ -66,24 +67,32 @@ export class EditorSession {
   readonly store: DocumentStore<SceneDocumentV2>
   readonly doc = shallowRef<SceneDocumentV2>(createEmptyDocument('', ''))
   readonly selection = shallowRef<string[]>([])
+  /** 鼠标悬停的节点（视口和场景树互相高亮）。 */
+  readonly hovered = shallowRef<string | null>(null)
   readonly twin = reactive(createTwinState())
   readonly ui = reactive({
     ready: false,
     error: '',
     warnings: [] as string[],
     mode: 'edit' as 'edit' | 'preview',
-    tool: 'translate' as GizmoMode,
+    tool: 'translate' as EditorTool,
     canUndo: false,
     canRedo: false,
+    undoLabel: '',
+    redoLabel: '',
+    /** 三维对象同步完成一次就加一；场景树靠它知道对象都建好了。 */
+    syncRevision: 0,
     saveState: 'saved' as SaveState,
     saveError: '',
     /** 保存时发现场景被别人改过。 */
     conflict: null as SceneConflict | null,
     /** 数据接口配置有问题时的提示。 */
     dataError: '',
-    /** 预览时弹出面板的节点。 */
-    panelNodeId: null as string | null,
-    panelAnchor: { x: 0, y: 0, visible: false } as PanelAnchor,
+    /** 右键菜单：屏幕位置和点到的场景位置。 */
+    contextMenu: null as { x: number; y: number; point: [number, number, number] | null } | null,
+    hasClipboard: false,
+    /** 正在往这个标签组里放置面板。 */
+    placing: null as string | null,
   })
 
   readonly nodes = new NodeEditing(this)
@@ -97,7 +106,7 @@ export class EditorSession {
   private readonly scenes: EditorSceneRepository
   private readonly resolver: BindingTargetResolver
   private readonly dataRuntime: TwinDataRuntime
-  private readonly panelTracker: PanelTracker
+  private readonly panelLayer: PanelLayer
   private previewPointers: ViewerPointerEvents | null = null
   private gizmoIds: string[] = []
   /** 已关闭：异步工作（截图、悬停检测）看到它就停止。 */
@@ -121,7 +130,7 @@ export class EditorSession {
       onEnd: () => this.store.seal(),
     })
     this.gizmo.setMode('translate')
-    this.panelTracker = new PanelTracker(this.engine, anchor => (this.ui.panelAnchor = anchor))
+    this.panelLayer = new PanelLayer(this.engine, id => this.sync.objectFor(id), this.twin)
     this.store.subscribe(change => this.onDocumentChange(change))
     this.pointer = new ViewportPointer(this)
   }
@@ -137,6 +146,7 @@ export class EditorSession {
       const { warnings } = await this.sync.mount(this.store.document)
       if (this.disposed) return
       this.ui.warnings = warnings
+      this.panelLayer.setDocument(this.store.document)
       this.dataRuntime.initialize(this.projectId, document.bindings)
       this.startData(document)
       if (!document.cameraView) await this.engine.fitAll(0)
@@ -153,7 +163,7 @@ export class EditorSession {
     this.disposed = true
     this.pointer.dispose()
     this.exitPreview()
-    this.panelTracker.dispose()
+    this.panelLayer.dispose()
     this.dataRuntime.stop()
     this.gizmo.dispose()
     this.sync.dispose()
@@ -194,9 +204,13 @@ export class EditorSession {
     this.doc.value = next
     this.ui.canUndo = this.store.canUndo
     this.ui.canRedo = this.store.canRedo
+    this.ui.undoLabel = this.store.undoLabel ?? ''
+    this.ui.redoLabel = this.store.redoLabel ?? ''
     void this.sync.update(next).then(({ warnings }) => {
       if (this.disposed) return
       if (warnings.length) this.ui.warnings = warnings
+      this.ui.syncRevision++
+      this.panelLayer.setDocument(next)
       this.dataRuntime.refresh()
       this.refreshSelectionVisuals()
     })
@@ -208,6 +222,7 @@ export class EditorSession {
     this.ui.saveState = this.store.isDirty ? 'unsaved' : 'saved'
     const ids = new Set(next.nodes.map(node => node.id))
     if (this.selection.value.some(id => !ids.has(id))) this.select(this.selection.value.filter(id => ids.has(id)))
+    if (this.ui.placing && !ids.has(this.ui.placing)) this.panels.stopPlacing()
   }
 
   /** 启动数据接口。配置有问题时不影响编辑，只给提示。 */
@@ -299,6 +314,8 @@ export class EditorSession {
     this.gizmo.setVisible(false)
     this.engine.setOutlined('selection', [])
     this.engine.setOutlined('hover', [])
+    this.panelLayer.setSelected([])
+    this.panelLayer.flush()
     try {
       return await render()
     } finally {
@@ -311,9 +328,10 @@ export class EditorSession {
 
   // ================================================================ 选择
 
-  select(ids: readonly string[], mode: 'replace' | 'toggle' = 'replace'): void {
+  select(ids: readonly string[], mode: 'replace' | 'toggle' | 'add' = 'replace'): void {
     let next: string[]
     if (mode === 'replace') next = [...new Set(ids)]
+    else if (mode === 'add') next = [...new Set([...this.selection.value, ...ids])]
     else {
       next = [...this.selection.value]
       for (const id of ids) {
@@ -339,22 +357,49 @@ export class EditorSession {
     if (this.disposed || this.ui.mode !== 'edit') return
     const objects = this.selection.value.flatMap(id => this.sync.objectFor(id) ?? [])
     this.engine.setOutlined('selection', objects)
+    this.panelLayer.setSelected(this.selection.value)
     const ids = topmost(this.doc.value, this.selection.value)
-    this.gizmoIds = ids.filter(id => !isLockedOrHidden(this.doc.value, id).locked)
+    // 选择工具和放置面板时不显示手柄：手柄会挡住点击。
+    const hideGizmo = this.ui.tool === 'select' || !!this.ui.placing
+    this.gizmoIds = hideGizmo ? [] : ids.filter(id => !isLockedOrHidden(this.doc.value, id).locked)
     this.gizmo.attach(this.gizmoIds.flatMap(id => this.sync.objectFor(id) ?? []))
     this.gizmo.setVisible(this.gizmoIds.length > 0)
   }
 
-  setTool(tool: GizmoMode): void {
+  setTool(tool: EditorTool): void {
     this.ui.tool = tool
-    this.gizmo.setMode(tool)
+    if (tool !== 'select') this.gizmo.setMode(tool)
     this.refreshSelectionVisuals()
   }
 
   async focusSelection(): Promise<void> {
-    const objects = this.selection.value.flatMap(id => this.sync.objectFor(id) ?? [])
-    if (objects.length) await this.engine.focus(objects)
+    const ids = this.selection.value.filter(id => this.sync.objectFor(id))
+    if (ids.length) await this.focusNodes(ids)
     else await this.engine.fitAll()
+  }
+
+  /** 相机框住这些节点和它们显示着的面板。 */
+  private focusNodes(ids: readonly string[]): Promise<boolean> {
+    const box = new Box3()
+    for (const id of ids) {
+      box.expandByObject(this.sync.objectFor(id)!, true)
+      this.panelLayer.expandWithPanels(box, id)
+    }
+    return this.engine.focusBox(box)
+  }
+
+  /** 固定视角：透视、顶、前、右，都框住整个场景。 */
+  async viewFrom(direction: 'top' | 'front' | 'right' | 'perspective'): Promise<void> {
+    const box = new Box3()
+    for (const object of this.sync.roots) box.expandByObject(object, true)
+    if (box.isEmpty()) box.set(new Vector3(-20, 0, -20), new Vector3(20, 10, 20))
+    const directions = {
+      top: new Vector3(0, 1, 0.0001),
+      front: new Vector3(0, 0.25, 1),
+      right: new Vector3(1, 0.25, 0),
+      perspective: new Vector3(1, 0.8, 1),
+    }
+    await this.engine.rig.fitBox(box, { direction: directions[direction], duration: 0.6, padding: 1.05 })
   }
 
   private applyGizmo(worlds: Matrix4[]): void {
@@ -376,11 +421,14 @@ export class EditorSession {
 
   // ================================================================ 预览
 
-  /** 预览：和 Viewer SDK 看到的一样，点击对象相机聚焦并弹出数据面板。 */
+  /** 预览：和 Viewer SDK 看到的一样，点击对象相机聚焦，面板按模板的显示方式出现。 */
   enterPreview(): void {
     if (this.ui.mode === 'preview') return
+    this.panels.stopPlacing()
     this.clearSelection()
+    this.ui.contextMenu = null
     this.ui.mode = 'preview'
+    this.panelLayer.setPlaying(true)
     this.engine.setHelpers({ grid: false, axes: false })
     this.engine.setOutlined('hover', [])
     this.gizmo.setVisible(false)
@@ -392,13 +440,14 @@ export class EditorSession {
       hit => {
         const object = this.resolver.resolve(hit.target)
         if (!object) return
+        const nodeId = targetNodeId(hit.target)
         this.engine.setOutlined('selection', [object])
-        void this.engine.focus(object)
-        this.openPanel(targetNodeId(hit.target))
+        this.panelLayer.setClicked(nodeId)
+        void this.focusNodes([nodeId])
       },
       () => {
         this.engine.setOutlined('selection', [])
-        this.closePanel()
+        this.panelLayer.setClicked(null)
       },
     )
   }
@@ -407,22 +456,11 @@ export class EditorSession {
     if (!this.previewPointers) return
     this.previewPointers.dispose()
     this.previewPointers = null
-    this.closePanel()
+    this.panelLayer.setPlaying(false)
     this.ui.mode = 'edit'
     this.engine.setOutlined('selection', [])
     this.engine.setHelpers(this.doc.value.settings.helpers)
     this.refreshSelectionVisuals()
-  }
-
-  private openPanel(nodeId: string): void {
-    const view = resolvePanel(this.doc.value, this.twin, nodeId)
-    this.ui.panelNodeId = nodeId
-    this.panelTracker.track(view ? this.sync.objectFor(view.nodeId) : null)
-  }
-
-  closePanel(): void {
-    this.ui.panelNodeId = null
-    this.panelTracker.track(null)
   }
 }
 

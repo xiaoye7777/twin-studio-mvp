@@ -21,14 +21,14 @@ export const useProjectStore = defineStore('project', () => {
     }
   }
 
-  async function create(name: string): Promise<ProjectInfo> {
-    const project = await projectApi.create(name)
+  async function create(name: string, description: string): Promise<ProjectInfo> {
+    const project = await projectApi.create(name, description)
     projects.value.push(project)
     return project
   }
 
-  async function rename(id: string, name: string): Promise<void> {
-    const updated = await projectApi.rename(id, name)
+  async function update(id: string, patch: { name: string; description: string }): Promise<void> {
+    const updated = await projectApi.update(id, patch)
     projects.value = projects.value.map(project => (project.id === id ? updated : project))
   }
 
@@ -37,5 +37,5 @@ export const useProjectStore = defineStore('project', () => {
     projects.value = projects.value.filter(project => project.id !== id)
   }
 
-  return { projects, loading, error, refresh, create, rename, remove }
+  return { projects, loading, error, refresh, create, update, remove }
 })

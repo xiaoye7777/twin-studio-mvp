@@ -1,34 +1,33 @@
 <script setup lang="ts">
 /*
- * Viewer SDK 的组件：加载 .twin.zip，显示场景，点击对象时聚焦并把对象的数据告诉宿主。
- * 项目里配了数据面板的对象，点击时还会弹出面板（宿主有自己的界面时可以用 :panels="false" 关掉）。
+ * Viewer SDK 的组件：加载一份场景 JSON（文件按资源 ID 向宿主要），显示场景，
+ * 点击对象时聚焦并把对象的数据告诉宿主。场景里的信息面板默认一起显示。
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import {
-  type LoadedTwinPackage,
-  loadTwinPackage,
-  type PanelAnchor,
-  PanelTracker,
-  resolvePanel,
-  targetNodeId,
+  type AssetResolver,
+  loadSceneDocument,
+  type SceneDocument,
   type TwinBindingTarget,
-  type TwinPackageSource,
   TwinSceneRuntime,
   type TwinSceneRuntimeOptions,
   type TwinSceneViewerEvents,
   type TwinSceneViewerPublicApi,
+  UrlAssetRepository,
   type ViewerQuality,
 } from '@twin-studio/core'
-import TwinPanelCard from './TwinPanelCard.vue'
 
 const props = withDefaults(
   defineProps<{
-    source: TwinPackageSource
+    /** 场景 JSON：解析好的对象，或一个返回 JSON 的地址。 */
+    scene: object | string
+    /** 资源 ID → 文件地址（也可以直接给 Blob）。 */
+    resolveAsset: AssetResolver
     /** 画质；auto 按设备和屏幕自适应。 */
     quality?: ViewerQuality
-    /** 点击对象时显示项目里配的数据面板。 */
+    /** 显示场景里的信息面板；宿主有自己的界面时可以关掉。 */
     panels?: boolean
-    /** 定时请求接口的认证请求头：Token 不进场景文件，由集成方提供。 */
+    /** HTTP 接口的认证请求头：Token 不进场景 JSON，由集成方提供。 */
     dataRequestHeaders?: TwinSceneRuntimeOptions['dataRequestHeaders']
   }>(),
   { quality: 'auto', panels: true, dataRequestHeaders: undefined },
@@ -37,51 +36,35 @@ const emit = defineEmits<TwinSceneViewerEvents>()
 const canvas = ref<HTMLCanvasElement>()
 const canvasKey = ref(0)
 const session = shallowRef<TwinSceneRuntime | null>(null)
-const loadedPackage = shallowRef<LoadedTwinPackage | null>(null)
 const loading = ref(false)
 const error = ref('')
 const warnings = ref<string[]>([])
-const panelNodeId = ref<string | null>(null)
-const panelAnchor = ref<PanelAnchor>({ x: 0, y: 0, visible: false })
-let tracker: PanelTracker | null = null
 let mounted = false
 let generation = 0
 let controller: AbortController | null = null
 
-/** 当前要显示的面板；读 runtimeRevision，数值变了会跟着刷新。 */
-const panelView = computed(() => {
-  // 先读 panelNodeId：document 不是响应式的，放在它后面判断的话，场景加载完之前短路，就收集不到这个依赖了。
-  const nodeId = panelNodeId.value
-  const runtime = session.value
-  if (!nodeId || !props.panels || !runtime?.document) return null
-  void runtime.twin.runtimeRevision
-  return resolvePanel(runtime.document, runtime.twin, nodeId)
-})
-
-function openPanel(target: TwinBindingTarget): void {
-  const runtime = session.value
-  if (!runtime?.document) return
-  const nodeId = targetNodeId(target)
-  panelNodeId.value = nodeId
-  tracker?.track(runtime.sync.objectFor(resolvePanel(runtime.document, runtime.twin, nodeId)?.nodeId ?? nodeId))
-}
-
-function closePanel(): void {
-  panelNodeId.value = null
-  tracker?.track(null)
-}
-
 function release(): void {
   controller?.abort()
   controller = null
-  closePanel()
-  tracker?.dispose()
-  tracker = null
   session.value?.dispose()
   session.value = null
-  loadedPackage.value?.dispose()
-  loadedPackage.value = null
 }
+
+/** 读出场景 JSON：地址要先下载；内容都要过校验。 */
+async function readScene(signal: AbortSignal): Promise<{ document: SceneDocument; dropped: string[] }> {
+  if (typeof props.scene !== 'string') return loadSceneDocument(props.scene)
+  const response = await fetch(props.scene, { signal })
+  if (!response.ok) throw new Error(`场景 JSON 读取失败（HTTP ${response.status}）`)
+  let raw: unknown
+  try {
+    raw = await response.json()
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === 'AbortError') throw cause
+    throw new Error(`场景地址返回的不是 JSON：${props.scene}`)
+  }
+  return loadSceneDocument(raw)
+}
+
 async function load(): Promise<void> {
   const request = ++generation
   release()
@@ -92,20 +75,20 @@ async function load(): Promise<void> {
   warnings.value = []
   loading.value = true
   controller = new AbortController()
+  const { signal } = controller
   try {
-    const portable = await loadTwinPackage(props.source, { signal: controller.signal })
-    if (!mounted || request !== generation) {
-      portable.dispose()
-      return
-    }
-    loadedPackage.value = portable
+    const { document, dropped } = await readScene(signal)
+    if (!mounted || request !== generation) return
+    const hdrAssetId = document.settings.sky.hdrAssetId
+    const assets = new UrlAssetRepository(id => props.resolveAsset(id), {
+      signal,
+      typeOf: id => (id === hdrAssetId ? 'environment' : 'model'),
+    })
     const runtime = new TwinSceneRuntime(
       canvas.value,
-      portable.sceneRepository,
-      portable.assetRepository,
+      assets,
       event => {
         if (!mounted || request !== generation) return
-        openPanel(event.target)
         emit('target-click', {
           ...event,
           target: { ...event.target },
@@ -115,21 +98,18 @@ async function load(): Promise<void> {
       },
       {
         quality: props.quality,
+        panels: props.panels,
         dataRequestHeaders: source => props.dataRequestHeaders?.(source),
-        onBlank: () => {
-          if (mounted && request === generation) closePanel()
-        },
       },
     )
     session.value = runtime
-    tracker = new PanelTracker(runtime.engine, anchor => (panelAnchor.value = anchor))
-    const result = await runtime.load(portable.projectId)
+    const result = [...dropped, ...(await runtime.load(document))]
     if (!mounted || request !== generation) return
     warnings.value = result
     emit('loaded', {
-      projectId: portable.projectId,
-      projectName: portable.projectName,
-      objectCount: runtime.document?.nodes.length ?? runtime.roots.length,
+      projectId: document.projectId,
+      projectName: document.metadata.name ?? '',
+      objectCount: document.nodes.length,
       bindingCount: runtime.twin.bindings.length,
       warnings: result,
     })
@@ -149,7 +129,7 @@ onMounted(() => {
   void load()
 })
 watch(
-  () => props.source,
+  () => props.scene,
   () => {
     if (mounted) void load()
   },
@@ -157,6 +137,10 @@ watch(
 watch(
   () => props.quality,
   quality => session.value?.setQuality(quality),
+)
+watch(
+  () => props.panels,
+  panels => session.value?.setPanelsEnabled(panels),
 )
 onBeforeUnmount(() => {
   mounted = false
@@ -188,10 +172,9 @@ defineExpose(publicApi)
   >
     <canvas :key="canvasKey" ref="canvas" class="twin-viewer__canvas" aria-label="数字孪生场景" />
     <div v-if="loading || error" role="status" class="twin-viewer__overlay">
-      <span v-if="!error" class="twin-viewer__spinner" aria-hidden="true" />{{ error || '正在加载项目包…' }}
+      <span v-if="!error" class="twin-viewer__spinner" aria-hidden="true" />{{ error || '正在加载场景…' }}
     </div>
     <div v-else-if="warnings.length" role="status" class="twin-viewer__warning">{{ warnings.join('；') }}</div>
-    <TwinPanelCard v-if="panelView" :view="panelView" :anchor="panelAnchor" @close="closePanel" />
   </div>
 </template>
 

@@ -127,3 +127,39 @@ export function mapDeviceMessages(
     return readValues(values, bindingsOfRow(row, bindings, deviceField), mapping)
   })
 }
+
+export interface MessageAnalysis {
+  /** 返回里有多少条数据。 */
+  rows: number
+  /** 返回里出现的设备编号。 */
+  deviceIds: string[]
+  /** 其中本接口涉及的设备。 */
+  matched: string[]
+  /** 能写入的变量值个数。 */
+  values: number
+}
+
+/** 试请求时用：告诉用户这份返回能解析出什么。 */
+export function analyzeMessages(
+  payload: unknown,
+  bindings: readonly TwinBinding[],
+  mapping?: SourceMapping,
+): MessageAnalysis {
+  const format = mapping?.format ?? 'device-row'
+  const deviceField = mapping?.deviceField ?? DEFAULT_DEVICE_FIELD
+  const rows = format === 'device-map' ? (isRecord(payload) ? Object.keys(payload) : []) : rowsOf(payload)
+  const found =
+    format === 'device-map'
+      ? (rows as string[])
+      : deviceField
+        ? rows.flatMap(row => (isRecord(row) ? (textOf(readPath(row, deviceField)) ?? []) : []))
+        : []
+  const deviceIds = [...new Set(found)]
+  const known = new Set(bindings.map(binding => binding.device.id))
+  return {
+    rows: rows.length,
+    deviceIds,
+    matched: deviceField || format === 'device-map' ? deviceIds.filter(id => known.has(id)) : [...known],
+    values: mapDeviceMessages(payload, bindings, mapping).length,
+  }
+}

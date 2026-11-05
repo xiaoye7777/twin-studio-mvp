@@ -1,6 +1,7 @@
 import type { DeepReadonly, DefineComponent } from 'vue'
 
-export type TwinPackageSource = string | URL | Blob | ArrayBuffer | Uint8Array
+/** Asset id → where the file is: a URL to download, or the file itself when the host downloads it. */
+export type AssetResolver = (assetId: string) => string | Blob | Promise<string | Blob>
 export type TwinBindingTarget =
   | { type: 'asset-instance'; instanceId: string }
   | { type: 'asset-node'; instanceId: string; assetNodeId: string }
@@ -50,7 +51,7 @@ export interface ViewerObjectValue {
 export interface ViewerObjectData {
   nodeId: string
   name: string
-  kind: 'model' | 'group'
+  kind: 'model' | 'group' | 'panel-group' | 'panel'
   device: TwinDevice | null
   bindingId: string | null
   values: ViewerObjectValue[]
@@ -69,7 +70,7 @@ export interface ViewerBookmark {
 }
 export type ViewerQuality = 'auto' | 'low' | 'medium' | 'high'
 export type DataSourceType = 'websocket' | 'http' | 'static'
-/** 'unconfigured': the package has no enabled data source, so no runtime values will ever appear. */
+/** 'unconfigured': the scene has no enabled data source, so no runtime values will ever appear. */
 export type DataSourceConnectionStatus = 'unconfigured' | 'connecting' | 'connected' | 'disconnected' | 'error'
 /** The live state of one data interface. */
 export interface DataSourceRuntimeState {
@@ -109,18 +110,10 @@ export interface TwinSceneViewerPublicApi {
   /** Back to the project's opening view. */
   resetView(durationSeconds?: number): Promise<boolean>
 }
-export interface LoadedTwinPackage {
-  readonly projectId: string
-  readonly projectName: string
-  readonly document: Readonly<SceneDocumentV2>
-  dispose(): void
-}
-/** Newest scene format this SDK can open; packages from a newer editor are rejected with an upgrade hint. */
+/** Newest scene format this SDK can open; scenes from a newer editor are rejected with an upgrade hint. */
 export declare const SCENE_DOCUMENT_VERSION: number
-export function loadTwinPackage(
-  source: TwinPackageSource,
-  options?: { signal?: AbortSignal },
-): Promise<LoadedTwinPackage>
+/** Checks a scene JSON and returns a clean copy; throws when it cannot be opened. */
+export function loadSceneDocument(raw: unknown): { document: SceneDocumentV2; dropped: string[] }
 export type Vector3Tuple = [number, number, number]
 export interface SceneTransform {
   position: Vector3Tuple
@@ -161,26 +154,41 @@ interface SceneNodeBaseV2 {
   visible: boolean
   locked: boolean
 }
-export type SceneNodeV2 = SceneNodeBaseV2 & ({ kind: 'model'; model: { assetId: string } } | { kind: 'group' })
+export type SceneNodeV2 = SceneNodeBaseV2 &
+  (
+    | { kind: 'model'; model: { assetId: string } }
+    | { kind: 'group' }
+    /** The parent of info panels; its template applies to all of them. */
+    | { kind: 'panel-group'; template: PanelTemplate }
+    /** An info panel placed in the scene, a child of a panel-group. */
+    | { kind: 'panel'; panel: PanelInstance }
+  )
 export interface CameraBookmark {
   id: string
   name: string
   view: CameraViewV2
   thumbnail?: string
 }
-/** A panel template: what the click panel shows. Changing it changes every instance. */
+/** What a group's panels show. Changing it changes every panel in the group. */
 export interface PanelTemplate {
-  id: string
-  name: string
   /** Empty: the device's name, or the node's. */
   title: string
-  fields: Array<{ id: string; label: string; variableKey: string; unit?: string }>
+  /** Width in metres: panels shrink with distance like any object and always face the camera. */
+  width: number
+  /** 'always' stays visible; 'click' appears when the linked object is clicked. */
+  trigger: 'always' | 'click'
+  fields: Array<{
+    id: string
+    label: string
+    variableKey: string
+    unit?: string
+    dataType?: 'number' | 'boolean' | 'string'
+  }>
 }
-/** A template placed on a scene node, with what differs from the template. */
+/** What differs from the template on one panel. */
 export interface PanelInstance {
-  id: string
-  templateId: string
-  nodeId: string
+  /** The linked object: the panel shows its device's data. */
+  targetNodeId?: string
   title?: string
   hiddenFields?: string[]
 }
@@ -194,16 +202,17 @@ export interface SceneDocumentV2 {
   nodes: SceneNodeV2[]
   bindings: TwinBinding[]
   bookmarks: CameraBookmark[]
-  panelTemplates: PanelTemplate[]
-  panels: PanelInstance[]
 }
 export const TwinSceneViewer: DefineComponent<{
-  source: TwinPackageSource
+  /** The scene JSON: a parsed object, or a URL that returns it. */
+  scene: object | string
+  /** The scene only holds asset ids; this says where each file is. */
+  resolveAsset: AssetResolver
   /** Render quality; 'auto' adapts to the device and screen. */
   quality?: ViewerQuality
-  /** Show the project's data panels when an object is clicked. Default true; hosts with their own UI can turn it off. */
+  /** Show the scene's info panels. Default true; hosts with their own UI can turn it off. */
   panels?: boolean
-  /** Auth headers for HTTP data sources: tokens never live in the package, the host provides them. */
+  /** Auth headers for HTTP data sources: tokens never live in the scene, the host provides them. */
   dataRequestHeaders?: (
     source: Extract<ProjectDataSource, { type: 'http' }>,
   ) => Record<string, string> | Promise<Record<string, string> | undefined> | undefined
@@ -230,9 +239,11 @@ export type ProjectDataSource = {
       /** http(s):// or a same-origin path starting with /. */
       url: string
       method: 'GET' | 'POST'
-      /** Seconds between requests. */
+      /** false: request once when the scene opens. Omitted or true: repeat every `interval` seconds. */
+      polling?: boolean
+      /** Seconds between requests while polling. */
       interval: number
-      /** Seconds; omitted = at most the interval, at most 15. */
+      /** Seconds; omitted = at most 15, and at most the interval while polling. */
       timeout?: number
       params?: Array<{ key: string; value: string }>
       /** No sign-in headers here: see `authRef`. */

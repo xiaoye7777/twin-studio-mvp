@@ -54,4 +54,10 @@ export class CameraViews {
     const bookmark = this.session.doc.value.bookmarks.find(item => item.id === id)
     if (bookmark) void this.session.engine.flyTo(bookmark.view)
   }
+
+  /** 打开场景时用现在这个视角。 */
+  setOpeningView(): void {
+    const view = this.currentView()
+    this.session.edit('设为初始视角', draft => void (draft.cameraView = view))
+  }
 }

@@ -9,7 +9,8 @@ import { findAssetInstanceRoot, getEditorMetadata } from '../scene/objectMetadat
 /** The binding target an object stands for, or null for unidentified parts. */
 export function bindingTargetFromObject(object: Object3D): TwinBindingTarget | null {
   const nodeId: unknown = object.userData.sceneNodeId
-  if (object.userData.nodeKind === 'group' && typeof nodeId === 'string') return { type: 'node', nodeId }
+  const kind: unknown = object.userData.nodeKind
+  if (typeof nodeId === 'string' && typeof kind === 'string' && kind !== 'model') return { type: 'node', nodeId }
   const assetRoot = findAssetInstanceRoot(object)
   const rootMetadata = assetRoot ? getEditorMetadata(assetRoot) : null
   if (!assetRoot || rootMetadata?.kind !== 'assetInstance') return null

@@ -234,10 +234,8 @@ export class TwinEngine {
     return this.rig.flyTo(view, { duration })
   }
 
-  /** Frames one or more objects. */
-  focus(objects: Object3D | readonly Object3D[], duration = 0.8): Promise<boolean> {
-    const box = new Box3()
-    for (const object of Array.isArray(objects) ? objects : [objects]) box.expandByObject(object as Object3D, true)
+  /** 把相机移到能框住这个范围的位置。 */
+  focusBox(box: Box3, duration = 0.8): Promise<boolean> {
     return this.rig.fitBox(box, { duration })
   }
 
@@ -262,17 +260,19 @@ export class TwinEngine {
     return new Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1)
   }
 
-  /** Hits on business objects, nearest first; hidden objects and infrastructure are skipped. */
+  /** 射线命中的业务对象，由近到远；隐藏的对象和基础设施跳过。信息面板总画在最上层，所以点击也先算它。 */
   raycastObjects(ndc: Vector2, _options: unknown = {}): Intersection<Object3D>[] {
     this.raycaster.setFromCamera(ndc, this.camera)
     this.raycaster.firstHitOnly = true
     const hits = this.raycaster.intersectObjects([...this.pickables], true)
-    return hits.filter(hit => {
-      for (let node: Object3D | null = hit.object; node && node !== this.content; node = node.parent) {
-        if (!node.visible || node.userData.editorInternal) return false
-      }
-      return true
-    })
+    return hits
+      .filter(hit => {
+        for (let node: Object3D | null = hit.object; node && node !== this.content; node = node.parent) {
+          if (!node.visible || node.userData.editorInternal) return false
+        }
+        return true
+      })
+      .sort((a, b) => Number(!!b.object.userData.panelSprite) - Number(!!a.object.userData.panelSprite))
   }
 
   pick(clientX: number, clientY: number): PickResult | null {
@@ -288,11 +288,19 @@ export class TwinEngine {
     return this.raycaster.ray.intersectPlane(new Plane(new Vector3(0, 1, 0), -height), new Vector3())
   }
 
-  /** The surface point under the cursor: the nearest object hit, else the ground. */
-  pointAt(clientX: number, clientY: number): Vector3 | null {
+  /** 光标下的物体表面（面板不算，放东西时要穿过它）：命中的物体和位置；没有物体时 object 是 null，位置在地面上。 */
+  surfaceAt(clientX: number, clientY: number): { object: Object3D | null; point: Vector3 } | null {
     const ndc = this.toNdc(clientX, clientY)
     if (!ndc) return null
-    return this.raycastObjects(ndc)[0]?.point.clone() ?? this.raycastGround(ndc)
+    const hit = this.raycastObjects(ndc).find(item => !item.object.userData.panelSprite)
+    if (hit) return { object: hit.object, point: hit.point.clone() }
+    const ground = this.raycastGround(ndc)
+    return ground ? { object: null, point: ground } : null
+  }
+
+  /** The surface point under the cursor: the nearest object hit, else the ground. */
+  pointAt(clientX: number, clientY: number): Vector3 | null {
+    return this.surfaceAt(clientX, clientY)?.point ?? null
   }
 
   // ---------------------------------------------------------------- outlines

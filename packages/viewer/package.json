@@ -1,8 +1,8 @@
 {
   "name": "@twin-studio/viewer",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "packageManager": "pnpm@10.20.0",
-  "description": "Portable Vue 3 viewer runtime for Twin Studio .twin.zip projects",
+  "description": "Vue 3 viewer for Twin Studio scenes: a scene JSON plus asset ids",
   "type": "module",
   "files": [
     "dist",

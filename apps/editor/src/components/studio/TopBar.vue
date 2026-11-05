@@ -1,22 +1,19 @@
 <script setup lang="ts">
+/** 顶栏：返回、场景名和保存状态、编辑 / 预览、撤销重做、主题、保存。 */
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Focus, Move, Play, Redo2, Rotate3d, Save, Scaling, Square, Undo2 } from 'lucide-vue-next'
+import { ChevronLeft, Redo2, Save, Undo2 } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import ThemeSwitcher from '@/components/ui/ThemeSwitcher.vue'
 import { useSession } from '@/studio/context'
 
 defineProps<{ projectName: string }>()
 const router = useRouter()
 const session = useSession()
 const ui = session.ui
-const preview = computed(() => ui.mode === 'preview')
-const tools = [
-  { id: 'translate', label: '移动（W）', icon: Move },
-  { id: 'rotate', label: '旋转（E）', icon: Rotate3d },
-  { id: 'scale', label: '缩放（R）', icon: Scaling },
-] as const
-const saveLabel = computed(
-  () => ({ saved: '已保存', unsaved: '保存', saving: '保存中…', error: '重新保存' })[ui.saveState],
+const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+'
+const saveStateLabel = computed(
+  () => ({ saved: '已保存', unsaved: '未保存', saving: '保存中…', error: '保存失败' })[ui.saveState],
 )
 
 /** 保存；场景被别人改过时让用户选择。 */
@@ -50,81 +47,163 @@ defineExpose({ save })
 
 <template>
   <header class="topbar">
-    <button class="s-icon-btn" title="返回场景列表" data-testid="back" @click="router.push('/scenes')">
-      <ArrowLeft :size="16" />
-    </button>
-    <strong class="topbar__name" :title="projectName">{{ projectName }}</strong>
+    <div class="topbar__left">
+      <button class="s-icon-btn" title="返回场景列表" data-testid="back" @click="router.push('/scenes')">
+        <ChevronLeft :size="16" />
+      </button>
+      <div class="topbar__brand" aria-hidden="true">T</div>
+      <div class="topbar__project">
+        <span class="topbar__name" :title="projectName">{{ projectName }}</span>
+        <span class="topbar__save" :class="`is-${ui.saveState}`" :title="ui.saveError" data-testid="save-state">
+          {{ saveStateLabel }}
+        </span>
+      </div>
+    </div>
 
-    <template v-if="!preview">
-      <span class="topbar__sep" />
-      <button class="s-icon-btn" title="撤销（Ctrl+Z）" :disabled="!ui.canUndo" @click="session.undo()">
-        <Undo2 :size="15" />
-      </button>
-      <button class="s-icon-btn" title="重做（Ctrl+Y）" :disabled="!ui.canRedo" @click="session.redo()">
-        <Redo2 :size="15" />
-      </button>
-      <span class="topbar__sep" />
+    <div class="topbar__mode" role="tablist" aria-label="模式">
       <button
-        v-for="tool in tools"
-        :key="tool.id"
-        class="s-icon-btn"
-        :class="{ 'is-active': ui.tool === tool.id }"
-        :title="tool.label"
-        :data-testid="`tool-${tool.id}`"
-        @click="session.setTool(tool.id)"
+        role="tab"
+        :aria-selected="ui.mode === 'edit'"
+        :class="{ 'is-active': ui.mode === 'edit' }"
+        data-testid="mode-edit"
+        @click="session.exitPreview()"
       >
-        <component :is="tool.icon" :size="15" />
+        编辑
       </button>
-      <button class="s-icon-btn" title="聚焦选中（F）" @click="session.focusSelection()"><Focus :size="15" /></button>
-    </template>
-
-    <span class="topbar__space" />
-
-    <button v-if="preview" class="s-btn" data-testid="exit-preview" @click="session.exitPreview()">
-      <Square :size="13" />退出预览
-    </button>
-    <template v-else>
-      <button class="s-btn" data-testid="enter-preview" :disabled="!ui.ready" @click="session.enterPreview()">
-        <Play :size="13" />预览
+      <button
+        role="tab"
+        :aria-selected="ui.mode === 'preview'"
+        :class="{ 'is-active': ui.mode === 'preview' }"
+        :disabled="!ui.ready"
+        data-testid="mode-preview"
+        @click="session.enterPreview()"
+      >
+        预览
       </button>
+    </div>
+
+    <div class="topbar__right">
+      <template v-if="ui.mode === 'edit'">
+        <button
+          class="s-icon-btn"
+          :disabled="!ui.canUndo"
+          :title="`撤销 ${ui.undoLabel}（${mod}Z）`"
+          data-testid="undo"
+          @click="session.undo()"
+        >
+          <Undo2 :size="15" />
+        </button>
+        <button
+          class="s-icon-btn"
+          :disabled="!ui.canRedo"
+          :title="`重做 ${ui.redoLabel}（${mod}⇧Z）`"
+          data-testid="redo"
+          @click="session.redo()"
+        >
+          <Redo2 :size="15" />
+        </button>
+        <span class="topbar__sep" />
+      </template>
+      <ThemeSwitcher />
       <button
         class="s-btn s-btn--primary"
         data-testid="save"
-        :disabled="ui.saveState === 'saving' || ui.saveState === 'saved'"
+        :disabled="ui.mode === 'preview' || ui.saveState === 'saving' || ui.saveState === 'saved'"
         @click="save"
       >
-        <Save :size="13" />{{ saveLabel }}
+        <Save :size="13" />保存
       </button>
-    </template>
+    </div>
   </header>
 </template>
 
 <style scoped>
 .topbar {
+  position: relative;
+  z-index: 20;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 10px;
+  gap: 12px;
+  padding: 0 8px;
   border-bottom: 1px solid var(--s-line);
-  background: var(--s-wash), var(--s-panel);
+  background: var(--s-wash-bar), var(--s-panel);
+}
+.topbar__left,
+.topbar__right {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+}
+.topbar__right {
+  justify-content: flex-end;
+}
+.topbar__brand {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--s-accent-2), var(--s-accent));
+  color: var(--s-on-accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+.topbar__project {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  margin: 0 6px 0 2px;
+  line-height: 1.2;
 }
 .topbar__name {
   overflow: hidden;
   max-width: 260px;
-  margin: 0 6px;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.topbar__save {
+  color: var(--s-fg-3);
+  font-size: 10.5px;
+}
+.topbar__save.is-unsaved,
+.topbar__save.is-saving {
+  color: var(--s-warn);
+}
+.topbar__save.is-error {
+  color: var(--s-danger);
+}
+.topbar__mode {
+  display: flex;
+  padding: 2px;
+  border: 1px solid var(--s-line-2);
+  border-radius: 6px;
+  background: var(--s-field);
+}
+.topbar__mode button {
+  width: 58px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--s-fg-3);
+  font-size: 12px;
+  cursor: pointer;
+}
+.topbar__mode button.is-active {
+  background: var(--s-active);
+  color: var(--s-fg);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+}
 .topbar__sep {
   width: 1px;
   height: 18px;
-  margin: 0 6px;
-  background: var(--s-line);
-}
-.topbar__space {
-  flex: 1;
+  margin: 0 4px;
+  background: var(--s-line-2);
 }
 .topbar .s-btn {
   height: 28px;

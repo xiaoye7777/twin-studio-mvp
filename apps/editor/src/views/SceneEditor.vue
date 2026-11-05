@@ -1,10 +1,11 @@
 <script setup lang="ts">
-/** 场景编辑器：顶栏、左栏（场景树 / 镜头 / 面板）、视口、底部资源栏、右栏（属性）。 */
+/** 场景编辑器：顶栏、左栏（场景树 / 镜头）、视口、底部资源栏、右栏（属性）。 */
 import { computed, onBeforeUnmount, onMounted, provide, ref, shallowRef } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import type { ProjectInfo } from '@/api/adapter'
 import { assetRepository, HttpSceneRepository, projectApi } from '@/api/repositories'
 import AssetDock from '@/components/studio/AssetDock.vue'
+import BatchBindDialog from '@/components/studio/BatchBindDialog.vue'
 import InspectorPanel from '@/components/studio/InspectorPanel.vue'
 import LeftPanel from '@/components/studio/LeftPanel.vue'
 import StudioViewport from '@/components/studio/StudioViewport.vue'
@@ -82,6 +83,7 @@ onBeforeUnmount(() => {
       </div>
       <InspectorPanel v-if="session?.ui.ready && !preview" class="studio__right" />
     </div>
+    <BatchBindDialog v-if="session?.ui.ready" />
   </div>
 </template>
 

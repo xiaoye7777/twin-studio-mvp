@@ -1,55 +1,69 @@
 <script setup lang="ts">
-/** 右栏：选中节点时是节点属性；在面板页点了模板时是模板；什么都没选时是场景的接口数据。 */
+/** 右栏：选中对象时是属性和数据；选中标签组时是模板配置；什么都没选时是场景的数据接口。 */
 import { computed } from 'vue'
-import { useSession } from '@/studio/context'
+import { nodeKindLabels, useSession } from '@/studio/context'
 import { useShell } from '@/studio/shell'
-import DataSources from './inspector/DataSources.vue'
-import NodeInspector from './inspector/NodeInspector.vue'
-import PanelTemplateEditor from './inspector/PanelTemplateEditor.vue'
+import NodeData from './inspector/NodeData.vue'
+import NodeProperties from './inspector/NodeProperties.vue'
+import PanelGroupInspector from './inspector/PanelGroupInspector.vue'
+import SceneData from './inspector/SceneData.vue'
 
 const session = useSession()
 const shell = useShell()
-const selected = computed(() => session.selectedNodes)
-const templates = computed(() => session.doc.value.panelTemplates)
-
-/** 多选时一次给所有选中的对象挂上面板模板。 */
-function attachTemplate(event: Event): void {
-  const select = event.target as HTMLSelectElement
-  if (select.value) session.panels.addInstances(select.value, session.selection.value)
-  select.value = ''
-}
-
-const template = computed(() =>
-  shell.leftTab === 'panels' && shell.templateId
-    ? session.doc.value.panelTemplates.find(item => item.id === shell.templateId)
-    : undefined,
-)
+const nodes = computed(() => session.selection.value.flatMap(id => session.node(id) ?? []))
+const panelGroup = computed(() => {
+  const node = nodes.value.length === 1 ? nodes.value[0]! : null
+  return node?.kind === 'panel-group' ? node : null
+})
+const title = computed(() => {
+  if (!nodes.value.length) return '场景'
+  if (nodes.value.length > 1) return `已选 ${nodes.value.length} 个对象`
+  return nodeKindLabels[nodes.value[0]!.kind] ?? '对象'
+})
+const nodeTabs = [
+  { id: 'properties', label: '属性' },
+  { id: 'data', label: '数据' },
+] as const
 </script>
 
 <template>
-  <aside class="s-panel" data-testid="inspector">
-    <NodeInspector v-if="selected.length === 1" :key="selected[0]!.id" :node="selected[0]!" />
-    <div v-else-if="selected.length > 1" class="inspector__many">
-      <p>已选中 {{ selected.length }} 个对象</p>
-      <select v-if="templates.length" class="s-select" data-testid="batch-template" @change="attachTemplate">
-        <option value="">批量挂上面板模板…</option>
-        <option v-for="item in templates" :key="item.id" :value="item.id">{{ item.name }}</option>
-      </select>
+  <aside class="s-panel inspector" data-testid="inspector">
+    <div class="s-panel-head">
+      <span v-if="panelGroup" class="s-tab is-active">模板</span>
+      <template v-else-if="nodes.length">
+        <button
+          v-for="tab in nodeTabs"
+          :key="tab.id"
+          class="s-tab"
+          :class="{ 'is-active': shell.nodeTab === tab.id }"
+          :data-testid="`inspector-tab-${tab.id}`"
+          @click="shell.nodeTab = tab.id"
+        >
+          {{ tab.label }}
+        </button>
+      </template>
+      <span v-else class="s-tab is-active">数据</span>
+      <span class="inspector__title">{{ title }}</span>
     </div>
-    <PanelTemplateEditor v-else-if="template" :key="template.id" :template="template" />
-    <DataSources v-else />
+    <div class="s-scroll">
+      <PanelGroupInspector v-if="panelGroup" :key="panelGroup.id" :node="panelGroup" />
+      <template v-else-if="nodes.length">
+        <NodeProperties v-if="shell.nodeTab === 'properties'" :nodes="nodes" />
+        <NodeData v-else :nodes="nodes" />
+      </template>
+      <SceneData v-else />
+    </div>
   </aside>
 </template>
 
 <style scoped>
-.inspector__many {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-}
-.inspector__many p {
-  margin: 0;
-  color: var(--s-fg-2);
+.inspector__title {
+  overflow: hidden;
+  margin-left: auto;
+  padding-right: 6px;
+  color: var(--s-fg-3);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

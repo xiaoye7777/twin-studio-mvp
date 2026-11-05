@@ -23,14 +23,14 @@ export const projectApi = {
   async get(id: string): Promise<ProjectInfo> {
     return adapter.toProject(await request(adapter.projectPath(id)))
   },
-  async create(name: string): Promise<ProjectInfo> {
+  async create(name: string, description: string): Promise<ProjectInfo> {
     return adapter.toProject(
-      await request(adapter.projectsPath(), { method: 'POST', json: adapter.createProjectBody(name) }),
+      await request(adapter.projectsPath(), { method: 'POST', json: adapter.createProjectBody({ name, description }) }),
     )
   },
-  async rename(id: string, name: string): Promise<ProjectInfo> {
+  async update(id: string, patch: { name: string; description: string }): Promise<ProjectInfo> {
     return adapter.toProject(
-      await request(adapter.projectPath(id), { method: 'PATCH', json: adapter.renameProjectBody(name) }),
+      await request(adapter.projectPath(id), { method: 'PATCH', json: adapter.updateProjectBody(patch) }),
     )
   },
   async remove(id: string): Promise<void> {

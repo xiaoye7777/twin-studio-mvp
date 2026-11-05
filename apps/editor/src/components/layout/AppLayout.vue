@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Boxes, Box } from 'lucide-vue-next'
 import { useRoute } from 'vue-router'
+import ThemeSwitcher from '@/components/ui/ThemeSwitcher.vue'
 import '@/studio/studio.css'
 
 const route = useRoute()
@@ -26,6 +27,7 @@ const nav = [
       >
         <component :is="item.icon" :size="16" />{{ item.label }}
       </RouterLink>
+      <div class="home__theme"><ThemeSwitcher align="start" label /></div>
     </aside>
     <main class="home__main">
       <RouterView />
@@ -87,6 +89,9 @@ const nav = [
 .home__link.is-active {
   background: var(--s-accent-soft);
   color: var(--s-accent-2);
+}
+.home__theme {
+  margin-top: auto;
 }
 .home__main {
   min-width: 0;

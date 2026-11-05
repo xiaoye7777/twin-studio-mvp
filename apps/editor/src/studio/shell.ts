@@ -3,9 +3,12 @@ import { inject, type InjectionKey, reactive } from 'vue'
 /** 编辑器窗口的界面状态（不属于场景文档）。 */
 export function createShellState() {
   return reactive({
-    leftTab: 'scene' as 'scene' | 'cameras' | 'panels',
-    /** 右栏正在编辑的面板模板；选中节点时右栏显示节点属性。 */
-    templateId: null as string | null,
+    leftTab: 'scene' as 'scene' | 'cameras',
+    /** 选中对象时右栏的页签。 */
+    nodeTab: 'properties' as 'properties' | 'data',
+    dialog: null as 'batch-bind' | null,
+    /** 场景树里正在改名的节点。 */
+    renaming: null as string | null,
   })
 }
 

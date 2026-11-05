@@ -9,7 +9,7 @@ type Assert<T extends true> = T
 
 export type PublicTypeChecks = [
   Assert<Same<Core.TwinBindingTarget, Public.TwinBindingTarget>>,
-  Assert<Same<Core.TwinPackageSource, Public.TwinPackageSource>>,
+  Assert<Same<Core.AssetResolver, Public.AssetResolver>>,
   Assert<Same<Core.ProjectDataSource, Public.ProjectDataSource>>,
   Assert<Same<Core.DataSourceConnectionStatus, Public.DataSourceConnectionStatus>>,
   Assert<Fits<Core.ViewerLoadedEvent, Public.ViewerLoadedEvent>>,

@@ -4,7 +4,12 @@
     <script>
       // 在页面渲染前设好主题，避免先闪一下错误的颜色。
       ;(function () {
-        var dark = matchMedia('(prefers-color-scheme: dark)').matches
+        // 和 theme/themes.ts 的规则一样：没选过就是深色。
+        var choice = 'dark'
+        try {
+          choice = localStorage.getItem('twin-studio:theme') || 'dark'
+        } catch (error) {}
+        var dark = choice === 'system' ? matchMedia('(prefers-color-scheme: dark)').matches : choice !== 'light'
         document.documentElement.dataset.theme = dark ? 'dark' : 'light'
         if (dark) document.documentElement.classList.add('dark')
       })()

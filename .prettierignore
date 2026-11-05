@@ -4,5 +4,4 @@ release
 pnpm-lock.yaml
 **/public/**
 *.md
-*.twin.zip
 apps/editor/.mock-data

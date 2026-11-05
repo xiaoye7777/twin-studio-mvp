@@ -1,6 +1,6 @@
-# @twin-studio/viewer 0.7.0
+# @twin-studio/viewer 0.8.0
 
-Vue 3 项目运行组件。支持 Node 20.16+ 和 pnpm 10.20.0；加载编辑器导出的 `.twin.zip`，恢复模型、设备绑定、实时数据、镜头和数据面板。
+Vue 3 项目运行组件。支持 Node 20.16+ 和 pnpm 10.20.0；加载编辑器保存的场景 JSON，按资源 ID 取模型文件，恢复模型、设备绑定、实时数据、镜头和信息面板。
 
 ```vue
 <script setup lang="ts">
@@ -9,13 +9,21 @@ import { TwinSceneViewer, type TwinSceneViewerPublicApi, type ViewerTargetClick 
 import '@twin-studio/viewer/style.css'
 
 const viewer = ref<TwinSceneViewerPublicApi | null>(null)
+// 场景 JSON 从后端取：GET /projects/{projectId}/scene 返回的 document
+const scene = ref<object | null>(null)
 
 function onClick(event: ViewerTargetClick) {
   console.log(event.data.name, event.data.device, event.data.values)
 }
 </script>
 <template>
-  <TwinSceneViewer ref="viewer" source="/project.twin.zip" @target-click="onClick" />
+  <TwinSceneViewer
+    v-if="scene"
+    ref="viewer"
+    :scene="scene"
+    :resolve-asset="id => `/api/v1/assets/${id}/content`"
+    @target-click="onClick"
+  />
 </template>
 ```
 
@@ -23,10 +31,11 @@ function onClick(event: ViewerTargetClick) {
 
 | 属性 | 默认 | 说明 |
 | --- | --- | --- |
-| `source` | 必填 | 项目包：URL、`Blob`、`ArrayBuffer` 或 `Uint8Array` |
+| `scene` | 必填 | 场景 JSON：解析好的对象，或一个返回 JSON 的地址。换一份就重新加载 |
+| `resolve-asset` | 必填 | 资源 ID → 模型文件。返回地址（SDK 自己下载），或 `Blob`（需要带登录信息时宿主下载好再给），可以是异步函数 |
 | `quality` | `auto` | 画质：`auto`、`low`、`medium`、`high` |
-| `panels` | `true` | 点击对象时显示项目里配的数据面板；宿主有自己的界面时设为 `false` |
-| `data-request-headers` | 无 | 定时请求接口的认证请求头。Token 不进项目包，由集成方提供 |
+| `panels` | `true` | 显示场景里的信息面板；宿主有自己的界面时设为 `false` |
+| `data-request-headers` | 无 | HTTP 接口的认证请求头。Token 不进场景 JSON，由集成方提供 |
 
 ## 双向联动
 
@@ -41,7 +50,7 @@ interface ViewerTargetClick {
   data: {
     nodeId: string
     name: string
-    kind: 'model' | 'group'
+    kind: 'model' | 'group' | 'panel-group' | 'panel'
     device: TwinDevice | null
     bindingId: string | null
     values: Array<{ key: string; name: string; unit?: string; value: number | boolean | string | null; updatedAt: string | null }>
@@ -65,13 +74,17 @@ viewer.value?.resetView()                                                 // 回
 
 ## 数据
 
-数值只来自项目配置的数据接口：WebSocket 推送、HTTP 定时请求或编辑器里手填的静态数据。接口没有连上时没有任何实时值，`value` 是 `null`。SDK 内不包含任何模拟数据。
+数值只来自场景配置的数据接口：WebSocket 推送、HTTP（只请求一次或定时请求）或编辑器里手填的静态数据。接口没有连上时没有任何实时值，`value` 是 `null`。SDK 内不包含任何模拟数据。
 
-配置随项目包分发，所以里面不能有账号、密码或 Token：需要认证的 HTTP 接口用 `data-request-headers` 由宿主提供。
+配置在场景 JSON 里，所以里面不能有账号、密码或 Token：需要认证的 HTTP 接口用 `data-request-headers` 由宿主提供。
 
-## 项目包的兼容
+## 信息面板
 
-由功能更全的编辑器导出的项目包也能打开：当前版本不支持的节点类型和字段会被忽略，比当前版本新的场景格式会提示升级。
+编辑器里放的信息面板是场景的一部分：大小以米为单位，镜头拉远时和物体一样变小，并且始终面向镜头。模板设成「点击显示」的面板，点击关联的对象时才出现，点空白处隐藏。
+
+## 场景的兼容
+
+只有 JSON + 资源 ID 这一种格式，不再支持 `.twin.zip`。功能更全的编辑器存的场景也能打开：当前版本不支持的节点类型和字段会被忽略（`loaded` 事件的 `warnings` 里有说明），比当前版本新的场景格式会提示升级。
 
 ## 打包
 

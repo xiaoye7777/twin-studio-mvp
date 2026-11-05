@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import { Box, Download, MoreHorizontal, PenLine, Trash2, Type } from 'lucide-vue-next'
+import { Box, MoreHorizontal, PenLine, Trash2, Type } from 'lucide-vue-next'
 import { computed } from 'vue'
 import type { ProjectInfo } from '@/api/adapter'
 import type { MenuSections } from '@/components/ui/menu'
 import UiDropdown from '@/components/ui/UiDropdown.vue'
 
-const props = defineProps<{ project: ProjectInfo; exporting?: boolean }>()
+const props = defineProps<{ project: ProjectInfo }>()
 const emit = defineEmits<{
   edit: [project: ProjectInfo]
-  export: [project: ProjectInfo]
   rename: [project: ProjectInfo]
   remove: [project: ProjectInfo]
 }>()
@@ -21,14 +20,7 @@ const updated = computed(() =>
   }),
 )
 const menu = computed<MenuSections>(() => [
-  [
-    {
-      label: props.exporting ? '导出中…' : '导出项目包',
-      icon: Download,
-      action: () => emit('export', props.project),
-    },
-    { label: '重命名', icon: Type, action: () => emit('rename', props.project) },
-  ],
+  [{ label: '编辑信息', icon: Type, action: () => emit('rename', props.project) }],
   [{ label: '删除场景', icon: Trash2, danger: true, action: () => emit('remove', props.project) }],
 ])
 </script>
@@ -43,6 +35,9 @@ const menu = computed<MenuSections>(() => [
     <div class="card__body">
       <div class="card__text">
         <h3 :title="project.name">{{ project.name }}</h3>
+        <p v-if="project.description" class="card__description" :title="project.description">
+          {{ project.description }}
+        </p>
         <p>更新于 {{ updated }}</p>
       </div>
       <UiDropdown :sections="menu" align="end" :width="160">
@@ -59,7 +54,7 @@ const menu = computed<MenuSections>(() => [
   overflow: hidden;
   border: 1px solid var(--s-line);
   border-radius: 10px;
-  background: var(--s-panel);
+  background: var(--s-wash), var(--s-panel);
 }
 .card__cover {
   position: relative;
@@ -121,5 +116,11 @@ const menu = computed<MenuSections>(() => [
   margin: 2px 0 0;
   color: var(--s-fg-3);
   font-size: 11.5px;
+}
+.card__text p.card__description {
+  overflow: hidden;
+  color: var(--s-fg-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

@@ -3,7 +3,7 @@
  * Viewer SDK 的组件就是包了一层它。编辑器不用它，编辑器在 EditorSession 里自己组装。
  */
 import { reactive } from 'vue'
-import type { Object3D } from 'three'
+import { Box3, type Object3D } from 'three'
 import { targetNodeId, type TwinBindingTarget } from '../../domain/twin'
 import type { SceneDocumentV2 } from '../../domain/scene'
 import type {
@@ -15,9 +15,10 @@ import type {
   ViewerTargetClick,
 } from '../../contract/viewerContract'
 import { createViewerRuntimeState } from './viewerRuntimeState'
-import type { SceneRepository } from '../../infrastructure/scenes/SceneRepository'
 import type { AssetRepository } from '../../infrastructure/assets/AssetRepository'
 import { TwinEngine } from '../../engine/TwinEngine'
+import { PanelLayer } from '../panels/PanelLayer'
+import { dataOwnerOf } from '../panels/resolvePanel'
 import { SceneSync } from '../scene/SceneSync'
 import { BindingTargetResolver } from './BindingTargetResolver'
 import { createTwinState } from './createTwinState'
@@ -27,8 +28,10 @@ import { ViewerPointerEvents } from './ViewerPointerEvents'
 
 export interface TwinSceneRuntimeOptions {
   quality?: ViewerQuality
-  /** 定时请求接口的认证请求头（Token 不进场景文件，由集成方提供）。 */
+  /** HTTP 接口的认证请求头（Token 不进场景文件，由集成方提供）。 */
   dataRequestHeaders?: TwinDataRuntimeOptions['requestHeaders']
+  /** 显示场景里的信息面板。默认显示；宿主有自己的界面时可以关掉。 */
+  panels?: boolean
   /** 点到空白处。 */
   onBlank?: () => void
 }
@@ -43,13 +46,13 @@ export class TwinSceneRuntime {
   document: SceneDocumentV2 | null = null
   private readonly resolver: BindingTargetResolver
   private readonly data: TwinDataRuntime
+  private readonly panels: PanelLayer
   private pointers: ViewerPointerEvents | null = null
   private disposed = false
   private started = false
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
-    private readonly scenes: SceneRepository,
     assets: AssetRepository,
     private readonly onClick: (event: ViewerTargetClick) => void,
     private readonly options: TwinSceneRuntimeOptions = {},
@@ -58,21 +61,23 @@ export class TwinSceneRuntime {
     this.sync = new SceneSync(this.engine, assets)
     this.resolver = new BindingTargetResolver(id => this.sync.objectFor(id))
     this.data = new TwinDataRuntime(this.twin, this.resolver, { requestHeaders: options.dataRequestHeaders })
+    this.panels = new PanelLayer(this.engine, id => this.sync.objectFor(id), this.twin)
+    this.panels.setPlaying(true)
+    this.panels.setEnabled(options.panels ?? true)
   }
 
-  async load(projectId: string): Promise<string[]> {
+  /** 显示一份场景 JSON。 */
+  async load(document: SceneDocumentV2): Promise<string[]> {
     if (this.started || this.disposed) throw new Error('Runtime session already used')
     this.started = true
     try {
-      const document = await this.scenes.load(projectId)
-      if (this.disposed) return []
-      if (!document) throw new Error('该项目尚未保存场景，请先在编辑器中保存')
       this.document = document
       const { warnings } = await this.sync.mount(document)
       if (this.disposed) return []
       this.roots = this.sync.roots
+      this.panels.setDocument(document)
       if (!document.cameraView) await this.engine.fitAll(0)
-      this.data.initialize(projectId, document.bindings)
+      this.data.initialize(document.projectId, document.bindings)
       this.data.start(document.dataSources)
       this.pointers = new ViewerPointerEvents(
         this.canvas,
@@ -82,6 +87,7 @@ export class TwinSceneRuntime {
         hit => this.handleClick(hit),
         () => {
           this.highlight(null)
+          this.panels.setClicked(null)
           this.options.onBlank?.()
         },
       )
@@ -101,8 +107,14 @@ export class TwinSceneRuntime {
     const data = this.getObjectData(hit.target)
     if (!data) return
     this.highlight(this.getRuntimeObject(hit.target))
+    this.panels.setClicked(targetNodeId(hit.target))
     void this.focusTarget(hit.target)
-    this.onClick({ ...hit, data })
+    this.onClick({
+      ...hit,
+      device: hit.device ?? data.device ?? undefined,
+      bindingId: hit.bindingId ?? data.bindingId ?? undefined,
+      data,
+    })
   }
 
   private highlight(object: Object3D | null): void {
@@ -114,14 +126,17 @@ export class TwinSceneRuntime {
   }
 
   getObjectData(target: TwinBindingTarget): ViewerObjectData | null {
-    const node = this.document?.nodes.find(item => item.id === targetNodeId(target))
-    return node && !this.disposed ? readObjectData(node, this.twin) : null
+    const document = this.document
+    const node = document?.nodes.find(item => item.id === targetNodeId(target))
+    return document && node && !this.disposed ? readObjectData(node, this.twin, dataOwnerOf(document, node)) : null
   }
 
   async focusTarget(target: TwinBindingTarget): Promise<boolean> {
     const object = this.getRuntimeObject(target)
     if (!object) return false
-    await this.engine.focus(object)
+    const box = new Box3().setFromObject(object, true)
+    this.panels.expandWithPanels(box, targetNodeId(target))
+    await this.engine.focusBox(box)
     return true
   }
 
@@ -150,11 +165,16 @@ export class TwinSceneRuntime {
     this.engine.setQuality(quality)
   }
 
+  setPanelsEnabled(enabled: boolean): void {
+    this.panels.setEnabled(enabled)
+  }
+
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
     this.pointers?.dispose()
     this.pointers = null
+    this.panels.dispose()
     this.data.stop()
     this.sync.dispose()
     this.engine.dispose()

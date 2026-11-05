@@ -16,6 +16,7 @@ const DATA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '.mock-data
 interface Project {
   id: string
   name: string
+  description: string
   coverUrl: string | null
   createdAt: string
   updatedAt: string
@@ -101,12 +102,16 @@ async function handleProjects(request: IncomingMessage, parts: string[]): Promis
   if (!id) {
     if (request.method === 'GET') return ok(projects)
     if (request.method === 'POST') {
-      const { name } = JSON.parse((await readBody(request)).toString()) as { name?: string }
+      const { name, description } = JSON.parse((await readBody(request)).toString()) as {
+        name?: string
+        description?: string
+      }
       if (!name?.trim()) return fail(400, 40000, '项目名称不能为空')
       const now = new Date().toISOString()
       const project: Project = {
         id: `p_${randomUUID()}`,
         name: name.trim(),
+        description: description?.trim() ?? '',
         coverUrl: null,
         createdAt: now,
         updatedAt: now,
@@ -128,9 +133,13 @@ async function handleProjects(request: IncomingMessage, parts: string[]): Promis
   }
   if (request.method === 'GET') return ok(project)
   if (request.method === 'PATCH') {
-    const { name } = JSON.parse((await readBody(request)).toString()) as { name?: string }
-    if (!name?.trim()) return fail(400, 40000, '项目名称不能为空')
-    project.name = name.trim()
+    const { name, description } = JSON.parse((await readBody(request)).toString()) as {
+      name?: string
+      description?: string
+    }
+    if (name !== undefined && !name.trim()) return fail(400, 40000, '项目名称不能为空')
+    if (name !== undefined) project.name = name.trim()
+    if (description !== undefined) project.description = description.trim()
     project.updatedAt = new Date().toISOString()
     writeProjects(projects)
     return ok(project)

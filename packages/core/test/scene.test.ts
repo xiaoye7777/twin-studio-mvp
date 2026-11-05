@@ -3,12 +3,14 @@ import {
   createEmptyDocument,
   duplicateNodes,
   groupNodes,
+  nodeById,
   removeNodes,
   reparentNodes,
   ungroupNodes,
   worldMatrixOf,
 } from '../src/document/sceneOps'
-import { loadSceneDocument, SceneDocumentError, SceneDocumentVersionError } from '../src/domain/scene'
+import { createPanelTemplate } from '../src/domain/panels'
+import { canParent, loadSceneDocument, SceneDocumentError, SceneDocumentVersionError } from '../src/domain/scene'
 import type { SceneDocumentV2, SceneNodeV2 } from '../src/domain/scene'
 
 function model(id: string, position: [number, number, number] = [0, 0, 0]): SceneNodeV2 {
@@ -22,6 +24,14 @@ function model(id: string, position: [number, number, number] = [0, 0, 0]): Scen
     transform: { position, rotation: [0, 0, 0], scale: [1, 1, 1] },
     model: { assetId: 'asset_1' },
   }
+}
+
+function panelGroup(id: string): SceneNodeV2 {
+  return { ...model(id), kind: 'panel-group', template: createPanelTemplate() } as SceneNodeV2
+}
+
+function panel(id: string, parentId: string | null, targetNodeId?: string): SceneNodeV2 {
+  return { ...model(id), parentId, kind: 'panel', panel: targetNodeId ? { targetNodeId } : {} } as SceneNodeV2
 }
 
 function documentWith(...nodes: SceneNodeV2[]): SceneDocumentV2 {
@@ -59,36 +69,65 @@ describe('loadSceneDocument', () => {
     expect(document.nodes.map(node => node.id)).toEqual(['a'])
     expect(document.dataSources).toEqual([])
     expect(document).not.toHaveProperty('effects')
-    expect(document.panels).toEqual([])
     expect(dropped).toHaveLength(1)
   })
 })
 
 describe('scene edits', () => {
-  it('removing a node removes its subtree, device bindings and panel instances', () => {
-    const document = documentWith(model('a'), model('b'))
+  it('removing a node removes its subtree and device bindings, and unlinks panels', () => {
+    const document = documentWith(model('a'), model('b'), panelGroup('labels'), panel('p', 'labels', 'a'))
     groupNodes(document, ['a'])
     const group = document.nodes.find(node => node.kind === 'group')!
     document.bindings = [
       { id: 'b', target: { type: 'asset-instance', instanceId: 'a' }, device: { id: 'D', name: 'D' }, variables: [] },
     ]
-    document.panels = [{ id: 'p', templateId: 't', nodeId: 'a' }]
     removeNodes(document, [group.id])
-    expect(document.nodes.map(node => node.id)).toEqual(['b'])
+    expect(document.nodes.map(node => node.id)).toEqual(['b', 'labels', 'p'])
     expect(document.bindings).toEqual([])
-    expect(document.panels).toEqual([])
+    expect(nodeById(document, 'p')).toMatchObject({ panel: {} })
+    expect(nodeById(document, 'p')).not.toHaveProperty('panel.targetNodeId')
   })
 
-  it('duplicating keeps panel instances but not device bindings', () => {
+  it('removing a panel group removes its panels', () => {
+    const document = documentWith(panelGroup('labels'), panel('p', 'labels'))
+    removeNodes(document, ['labels'])
+    expect(document.nodes).toEqual([])
+  })
+
+  it('duplicating does not copy device bindings', () => {
     const document = documentWith(model('a'))
     document.bindings = [
       { id: 'b', target: { type: 'asset-instance', instanceId: 'a' }, device: { id: 'D', name: 'D' }, variables: [] },
     ]
-    document.panels = [{ id: 'p', templateId: 't', nodeId: 'a', title: '自定义' }]
     const [copy] = duplicateNodes(document, ['a'], [5, 0, 0])
     expect(document.nodes.find(node => node.id === copy)?.transform.position).toEqual([5, 0, 0])
     expect(document.bindings).toHaveLength(1)
-    expect(document.panels.find(panel => panel.nodeId === copy)).toMatchObject({ templateId: 't', title: '自定义' })
+  })
+
+  it('a copied panel links to the copy of its object when both are copied', () => {
+    const document = documentWith(panelGroup('labels'), panel('p', 'labels', 'a'), model('a'))
+    const [copyOfPanel] = duplicateNodes(document, ['p'], [1, 0, 0])
+    expect(nodeById(document, copyOfPanel!)).toMatchObject({ parentId: 'labels', panel: { targetNodeId: 'a' } })
+    const group = groupNodes(document, ['a'])!
+    expect(group).toBeTruthy()
+  })
+
+  it('panels stay inside panel groups', () => {
+    const document = documentWith(panelGroup('labels'), panel('p', 'labels'), model('a'))
+    reparentNodes(document, ['p'], null)
+    expect(nodeById(document, 'p')?.parentId).toBe('labels')
+    reparentNodes(document, ['a'], 'labels')
+    expect(nodeById(document, 'a')?.parentId).toBeNull()
+    expect(groupNodes(document, ['p'])).toBeNull()
+    expect(canParent('panel-group', 'panel')).toBe(true)
+    expect(canParent(null, 'panel')).toBe(false)
+    expect(canParent('panel-group', 'model')).toBe(false)
+  })
+
+  it('rejects a scene with a panel outside a panel group', () => {
+    const document = documentWith(panel('p', null))
+    expect(() => loadSceneDocument(document)).toThrow(SceneDocumentError)
+    expect(() => loadSceneDocument(documentWith(panelGroup('labels'), panel('p', 'labels')))).not.toThrow()
   })
 
   it('grouping and reparenting keep objects where they are in the world', () => {

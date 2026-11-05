@@ -10,6 +10,8 @@ import type { AssetType, SceneDocument } from '@twin-studio/core'
 export interface ProjectInfo {
   id: string
   name: string
+  /** 描述；没填是空字符串。 */
+  description: string
   coverUrl: string | null
   createdAt: string
   updatedAt: string
@@ -72,8 +74,8 @@ export interface ApiAdapter {
   isAssetInUse(result: ApiResult): boolean
 
   // 请求：把前端的数据翻译成后端要的结构
-  createProjectBody(name: string): unknown
-  renameProjectBody(name: string): unknown
+  createProjectBody(input: { name: string; description: string }): unknown
+  updateProjectBody(input: { name: string; description: string }): unknown
   saveSceneBody(input: { baseRevision: number; saveId: string; document: SceneDocument }): unknown
   uploadAssetForm(file: File, assetType: AssetType): FormData
 
@@ -87,6 +89,12 @@ export interface ApiAdapter {
   toAssets(raw: unknown): AssetInfo[]
   /** 上传的返回。 */
   toUploadedAsset(raw: unknown): AssetInfo
+}
+
+/** 后端没返回描述时当作空。 */
+function toProjectInfo(raw: unknown): ProjectInfo {
+  const project = raw as ProjectInfo
+  return { ...project, description: project.description ?? '' }
 }
 
 export const defaultAdapter: ApiAdapter = {
@@ -108,8 +116,8 @@ export const defaultAdapter: ApiAdapter = {
   isSceneConflict: result => result.code === 40901,
   isAssetInUse: result => result.code === 40902,
 
-  createProjectBody: name => ({ name }),
-  renameProjectBody: name => ({ name }),
+  createProjectBody: input => input,
+  updateProjectBody: input => input,
   saveSceneBody: input => input,
   uploadAssetForm(file, assetType) {
     const form = new FormData()
@@ -119,8 +127,8 @@ export const defaultAdapter: ApiAdapter = {
     return form
   },
 
-  toProject: raw => raw as ProjectInfo,
-  toProjects: raw => raw as ProjectInfo[],
+  toProject: toProjectInfo,
+  toProjects: raw => (raw as unknown[]).map(toProjectInfo),
   toSceneRead: raw => raw as SceneRead,
   toSceneSaved: raw => raw as SceneSaved,
   toSceneConflict(raw) {

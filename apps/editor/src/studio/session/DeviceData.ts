@@ -1,151 +1,280 @@
 import {
   type ActiveDataSourceConfig,
+  bindingsForSource,
+  type DataSourceProbeResult,
+  dataOwnerOf,
+  formatRuntimeValue,
+  type HttpDataSourceConfig,
   newDataSource,
   newId,
   nodeById,
   plain,
-  type ProjectDataSource,
+  probeDataSource,
   type SceneDocumentV2,
+  sourceProvides,
   type StaticDataSourceConfig,
   targetForNode,
   type TwinBinding,
+  type TwinBindingTarget,
   twinBindingTargetKey,
+  type TwinDevice,
   type TwinVariableDefinition,
+  type WebSocketDataSourceConfig,
 } from '@twin-studio/core'
+import { deviceIdFor, deviceVariables, type DeviceTemplate } from '../deviceTemplates'
 import type { EditorSession } from '../EditorSession'
 
-export type StaticValue = number | string | boolean
-
-/** 第一个静态数据接口。 */
-function staticSourceOf(document: SceneDocumentV2): StaticDataSourceConfig | undefined {
-  return document.dataSources?.find((source): source is StaticDataSourceConfig => source.type === 'static')
+/** 场景里的一台设备。设备来自绑定：同一个设备编号可以绑定到多个对象，这里合并成一台。 */
+export interface SceneDevice {
+  id: string
+  name: string
+  type?: string
+  bindings: TwinBinding[]
+  /** 各绑定的变量合并去重。 */
+  variables: TwinVariableDefinition[]
 }
 
-function bindingOf(document: SceneDocumentV2, nodeId: string): TwinBinding | undefined {
+/** 修改接口配置：除了 id 和类型，其他字段都能改。 */
+export type SourcePatch =
+  | Partial<Omit<HttpDataSourceConfig, 'id' | 'type'>>
+  | Partial<Omit<WebSocketDataSourceConfig, 'id' | 'type'>>
+  | Partial<Omit<StaticDataSourceConfig, 'id' | 'type'>>
+
+const sourceNames: Record<ActiveDataSourceConfig['type'], string> = {
+  websocket: '推送接口',
+  http: 'HTTP 接口',
+  static: '静态数据',
+}
+
+/** 节点的设备绑定写在哪：关联了对象的面板写在对象上，其他都是节点自己。 */
+function targetOf(document: SceneDocumentV2, nodeId: string): TwinBindingTarget | null {
   const node = nodeById(document, nodeId)
-  if (!node) return undefined
-  const key = twinBindingTargetKey(targetForNode(node))
+  return node ? targetForNode(dataOwnerOf(document, node)) : null
+}
+
+export function bindingOf(document: SceneDocumentV2, nodeId: string): TwinBinding | undefined {
+  const target = targetOf(document, nodeId)
+  if (!target) return undefined
+  const key = twinBindingTargetKey(target)
   return document.bindings.find(binding => twinBindingTargetKey(binding.target) === key)
 }
 
-/** 把节点绑到设备上；已经绑了就改设备信息。写给 Immer 草稿用。 */
-export function writeDevice(
-  draft: SceneDocumentV2,
-  nodeId: string,
-  device: { id: string; name: string },
-  variables?: TwinVariableDefinition[],
-): void {
-  const node = nodeById(draft, nodeId)
-  if (!node) return
-  const existing = bindingOf(draft, nodeId)
-  if (!existing) {
-    draft.bindings.push({
-      id: newId('binding'),
-      target: targetForNode(node),
-      device: { ...device },
-      variables: variables ?? [],
-    })
-    return
+/** 静态数据按设备编号存：编号改了要把值带过去，除非旧编号还有别的对象在用。 */
+function moveStaticValues(draft: SceneDocumentV2, from: string, to: string): void {
+  if (from === to || draft.bindings.some(binding => binding.device.id === from)) return
+  for (const source of draft.dataSources ?? []) {
+    if (source.type !== 'static' || !source.values[from]) continue
+    // 新编号已经有值时保留它：那是另一台设备的数据。
+    source.values[to] ??= source.values[from]
+    delete source.values[from]
   }
-  // 静态数据按设备编号存：改编号时把值带过去。
-  const source = staticSourceOf(draft)
-  const values = source?.values[existing.device.id]
-  if (source && values && existing.device.id !== device.id) {
-    source.values[device.id] = values
-    delete source.values[existing.device.id]
-  }
-  existing.device = { ...existing.device, ...device }
-  if (variables) existing.variables = variables
 }
 
-/** 设备绑定和数据接口。 */
+/** 写节点的设备绑定，没有就新建。写给 Immer 草稿用。 */
+export function writeBinding(
+  draft: SceneDocumentV2,
+  nodeId: string,
+  device: TwinDevice,
+  variables: TwinVariableDefinition[],
+): void {
+  const target = targetOf(draft, nodeId)
+  if (!target) return
+  const existing = bindingOf(draft, nodeId)
+  if (!existing) {
+    draft.bindings.push({ id: newId('binding'), target, device: plain(device), variables: plain(variables) })
+    return
+  }
+  const previous = existing.device.id
+  existing.device = plain(device)
+  existing.variables = plain(variables)
+  moveStaticValues(draft, previous, device.id)
+}
+
+/**
+ * 设备数据：对象 ↔ 设备的绑定、批量绑定、场景的数据接口（可以同时启用多个）、实时值的显示。
+ * 接口怎么运行在 core 的 TwinDataRuntime。
+ */
 export class DeviceData {
   constructor(private readonly session: EditorSession) {}
 
-  bindingOf(nodeId: string): TwinBinding | undefined {
+  bindingFor(nodeId: string): TwinBinding | undefined {
     return bindingOf(this.session.doc.value, nodeId)
   }
 
-  // ---------------------------------------------------------------- 设备绑定
-
-  setDevice(nodeId: string, device: { id: string; name: string }): void {
-    this.session.edit('绑定设备', draft => writeDevice(draft, nodeId, device))
+  setBinding(nodeId: string, update: Omit<TwinBinding, 'id' | 'target'>): void {
+    this.session.edit('设备绑定', draft => writeBinding(draft, nodeId, update.device, update.variables))
   }
 
-  removeDevice(nodeId: string): void {
-    this.session.edit('解除设备绑定', draft => {
-      const existing = bindingOf(draft, nodeId)
-      if (existing) draft.bindings = draft.bindings.filter(binding => binding !== existing)
+  removeBinding(nodeId: string): void {
+    const binding = this.bindingFor(nodeId)
+    if (!binding) return
+    this.session.edit('解除绑定', draft => {
+      draft.bindings = draft.bindings.filter(item => item.id !== binding.id)
     })
   }
 
-  addVariable(nodeId: string): void {
-    this.session.edit('添加变量', draft => {
-      const binding = bindingOf(draft, nodeId)
-      if (!binding) return
-      const key = `var${binding.variables.length + 1}`
-      binding.variables.push({ id: newId('variable'), key, name: key, dataType: 'number' })
+  /** 给每个节点绑一台这种类型的设备，编号从 start 开始。返回绑了多少个。 */
+  batchBind(
+    nodeIds: readonly string[],
+    template: DeviceTemplate,
+    prefix: string,
+    start: number,
+    namePrefix: string,
+  ): number {
+    const nodes = nodeIds.flatMap(id => this.session.node(id) ?? [])
+    if (!nodes.length) return 0
+    this.session.edit(`批量绑定 ${nodes.length} 台${template.name}`, draft => {
+      nodes.forEach((node, index) => {
+        const number = start + index
+        writeBinding(
+          draft,
+          node.id,
+          {
+            id: deviceIdFor(prefix, number),
+            name: `${namePrefix} ${String(number).padStart(2, '0')}`,
+            type: template.type,
+          },
+          deviceVariables(template),
+        )
+      })
     })
+    return nodes.length
   }
 
-  updateVariable(nodeId: string, variableId: string, patch: Partial<Omit<TwinVariableDefinition, 'id'>>): void {
-    this.session.edit('修改变量', draft => {
-      const variable = bindingOf(draft, nodeId)?.variables.find(item => item.id === variableId)
-      if (!variable) return
-      if (patch.unit === '') delete variable.unit
-      const { unit, ...rest } = patch
-      Object.assign(variable, rest, unit ? { unit } : {})
-    })
-  }
-
-  removeVariable(nodeId: string, variableId: string): void {
-    this.session.edit('删除变量', draft => {
-      const binding = bindingOf(draft, nodeId)
-      if (binding) binding.variables = binding.variables.filter(item => item.id !== variableId)
-    })
-  }
-
-  // ---------------------------------------------------------------- 静态数据
-
-  staticValue(deviceId: string, key: string): StaticValue | undefined {
-    return staticSourceOf(this.session.doc.value)?.values[deviceId]?.[key]
-  }
-
-  /** 改一个静态值；场景还没有静态数据接口时自动建一个。清空传 undefined。 */
-  setStaticValue(deviceId: string, key: string, value: StaticValue | undefined): void {
-    this.session.edit('修改静态数据', draft => {
-      draft.dataSources ??= []
-      let source = staticSourceOf(draft)
-      if (!source) {
-        if (value === undefined) return
-        source = newDataSource('static', newId('source')) as StaticDataSourceConfig
-        draft.dataSources.push(source)
+  /** 场景里所有设备（按第一次绑定的顺序）。 */
+  get devices(): SceneDevice[] {
+    const devices = new Map<string, SceneDevice>()
+    for (const binding of this.session.doc.value.bindings) {
+      const device = devices.get(binding.device.id) ?? {
+        id: binding.device.id,
+        name: binding.device.name,
+        type: binding.device.type,
+        bindings: [],
+        variables: [],
       }
-      const device = (source.values[deviceId] ??= {})
-      if (value === undefined) delete device[key]
-      else device[key] = value
-    })
+      device.bindings.push(binding)
+      for (const variable of binding.variables)
+        if (!device.variables.some(item => item.key === variable.key)) device.variables.push(variable)
+      devices.set(device.id, device)
+    }
+    return [...devices.values()]
   }
 
-  // ---------------------------------------------------------------- 数据接口
+  // ---------------------------------------------------------------- 数据接口（场景级，可以同时启用多个）
 
-  addSource(type: ActiveDataSourceConfig['type']): void {
+  /** 所有接口，按列表顺序（也是优先级）。 */
+  get sources(): ActiveDataSourceConfig[] {
+    return this.session.doc.value.dataSources ?? []
+  }
+
+  source(id: string): ActiveDataSourceConfig | undefined {
+    return this.sources.find(source => source.id === id)
+  }
+
+  /** 新建一个接口，返回它的 ID。 */
+  addSource(type: ActiveDataSourceConfig['type']): string {
+    const id = newId('source')
     this.session.edit('添加数据接口', draft => {
-      draft.dataSources ??= []
-      draft.dataSources.push(newDataSource(type, newId('source')))
+      const sources = draft.dataSources ?? []
+      const sameType = sources.filter(source => source.type === type).length
+      const name = sameType ? `${sourceNames[type]} ${sameType + 1}` : sourceNames[type]
+      sources.push({ ...newDataSource(type, id), name })
+      draft.dataSources = sources
     })
+    return id
   }
 
-  updateSource(id: string, patch: Partial<ProjectDataSource>): void {
-    this.session.edit('修改数据接口', draft => {
-      const source = draft.dataSources?.find(item => item.id === id)
-      if (source) Object.assign(source, plain(patch))
-    })
+  /** 修改一个接口。连续输入用同一个 coalesceKey 合并成一步撤销。 */
+  updateSource(id: string, patch: SourcePatch, coalesceKey?: string): void {
+    this.session.edit(
+      '数据接口设置',
+      draft => {
+        const source = draft.dataSources?.find(item => item.id === id)
+        if (source) Object.assign(source, plain(patch))
+      },
+      { coalesceKey },
+    )
   }
 
   removeSource(id: string): void {
     this.session.edit('删除数据接口', draft => {
-      draft.dataSources = draft.dataSources?.filter(item => item.id !== id)
+      draft.dataSources = draft.dataSources?.filter(source => source.id !== id)
     })
+  }
+
+  /** 复制一个接口（放在它后面），返回新接口的 ID。 */
+  duplicateSource(id: string): string | null {
+    const original = this.source(id)
+    if (!original) return null
+    const copy = { ...plain(original), id: newId('source'), name: `${original.name} 副本` }
+    this.session.edit('复制数据接口', draft => {
+      const sources = draft.dataSources ?? []
+      sources.splice(sources.findIndex(source => source.id === id) + 1, 0, copy)
+    })
+    return copy.id
+  }
+
+  /** 调整顺序：靠前的优先。 */
+  moveSource(id: string, delta: -1 | 1): void {
+    this.session.edit('调整接口顺序', draft => {
+      const sources = draft.dataSources ?? []
+      const index = sources.findIndex(source => source.id === id)
+      const target = index + delta
+      if (index < 0 || target < 0 || target >= sources.length) return
+      const [moved] = sources.splice(index, 1)
+      sources.splice(target, 0, moved!)
+    })
+  }
+
+  /** 哪些启用的接口提供这个变量（只看「涉及设备」的范围）。 */
+  providersOf(deviceId: string, key: string): ActiveDataSourceConfig[] {
+    return this.sources.filter(source => source.enabled && sourceProvides(source, deviceId, key))
+  }
+
+  /** 这个变量可以手填时对应的静态接口：范围内第一个启用的静态数据。 */
+  staticSourceFor(deviceId: string, key: string): StaticDataSourceConfig | undefined {
+    return this.providersOf(deviceId, key).find((source): source is StaticDataSourceConfig => source.type === 'static')
+  }
+
+  /** 静态数据：设置一台设备一个变量的值；value 为 null 时删除。 */
+  setStaticValue(sourceId: string, deviceId: string, key: string, value: number | string | boolean | null): void {
+    const source = this.source(sourceId)
+    if (source?.type !== 'static') return
+    const values = plain(source.values)
+    const device = (values[deviceId] ??= {})
+    if (value === null) delete device[key]
+    else device[key] = value
+    if (!Object.keys(device).length) delete values[deviceId]
+    this.updateSource(sourceId, { values }, `static:${sourceId}:${deviceId}:${key}`)
+  }
+
+  /** 静态数据：把当前收到的实时值记下来（例如先连接口，再用静态数据演示）。返回记下的个数。 */
+  captureStaticValues(sourceId: string): number {
+    const values: Record<string, Record<string, number | string | boolean>> = {}
+    let count = 0
+    for (const binding of this.session.doc.value.bindings)
+      for (const variable of binding.variables) {
+        const value = this.session.twin.getRuntimeValue(binding.id, variable.key)?.value
+        if (value === undefined) continue
+        ;(values[binding.device.id] ??= {})[variable.key] = value
+        count++
+      }
+    if (count) this.updateSource(sourceId, { values })
+    return count
+  }
+
+  /** 试请求：按当前配置请求一次（WebSocket 连上等第一条消息），不影响运行中的接口。 */
+  async probeSource(id: string): Promise<DataSourceProbeResult | null> {
+    const source = this.source(id)
+    if (!source || source.type === 'static') return null
+    return probeDataSource(source, bindingsForSource(source, this.session.doc.value.bindings))
+  }
+
+  liveValue(bindingId: string, key: string): string {
+    void this.session.twin.runtimeRevision
+    const variable = this.session.doc.value.bindings
+      .find(binding => binding.id === bindingId)
+      ?.variables.find(item => item.key === key)
+    return formatRuntimeValue(this.session.twin.getRuntimeValue(bindingId, key)?.value, variable?.unit)
   }
 }

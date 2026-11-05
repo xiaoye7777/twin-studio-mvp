@@ -1,26 +1,28 @@
 <script setup lang="ts">
-/** 「3D场景」页面：场景卡片，新建、打开、重命名、删除、导出项目包。 */
-import { ElMessage, ElMessageBox } from 'element-plus'
+/** 「3D场景」页面：场景卡片，新建、打开、改信息、删除。 */
+import { ElMessage } from 'element-plus'
 import { Box, Plus } from 'lucide-vue-next'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { ProjectInfo } from '@/api/adapter'
-import { downloadProjectPackage } from '@/api/exportPackage'
 import ProjectCard from '@/components/project/ProjectCard.vue'
+import ProjectDialog from '@/components/project/ProjectDialog.vue'
 import { confirmAction } from '@/components/ui/confirm'
 import { useProjectStore } from '@/stores/project'
 
 const router = useRouter()
 const store = useProjectStore()
-const exportingId = ref('')
+/** 对话框：新建时 project 是 null，编辑信息时是那个场景。 */
+const dialog = ref<{ project: ProjectInfo | null } | null>(null)
+const dialogOpen = computed({
+  get: () => !!dialog.value,
+  set: value => {
+    if (!value) dialog.value = null
+  },
+})
+const submitting = ref(false)
 
 onMounted(() => void store.refresh())
-
-const nameRule = {
-  inputValidator: (text: string) => (text.trim().length >= 2 && text.trim().length <= 40) || '名称为 2–40 个字符',
-  customClass: 'studio-dialog',
-  cancelButtonText: '取消',
-}
 
 function report(error: unknown, fallback: string): void {
   ElMessage.error(error instanceof Error ? error.message : fallback)
@@ -30,37 +32,17 @@ function open(project: ProjectInfo): void {
   void router.push({ name: 'editor', params: { projectId: project.id } })
 }
 
-async function create(): Promise<void> {
-  let name: string
+async function submit(value: { name: string; description: string }): Promise<void> {
+  const editing = dialog.value?.project
+  submitting.value = true
   try {
-    name = (await ElMessageBox.prompt('场景名称', '新建场景', { ...nameRule, confirmButtonText: '创建并打开' })).value
-  } catch {
-    return
-  }
-  try {
-    open(await store.create(name.trim()))
+    if (editing) await store.update(editing.id, value)
+    else open(await store.create(value.name, value.description))
+    dialog.value = null
   } catch (error) {
-    report(error, '创建失败')
-  }
-}
-
-async function rename(project: ProjectInfo): Promise<void> {
-  let name: string
-  try {
-    name = (
-      await ElMessageBox.prompt('新的名称', '重命名', {
-        ...nameRule,
-        inputValue: project.name,
-        confirmButtonText: '保存',
-      })
-    ).value
-  } catch {
-    return
-  }
-  try {
-    await store.rename(project.id, name.trim())
-  } catch (error) {
-    report(error, '重命名失败')
+    report(error, editing ? '保存失败' : '创建失败')
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -73,19 +55,6 @@ async function remove(project: ProjectInfo): Promise<void> {
     report(error, '删除失败')
   }
 }
-
-async function exportPackage(project: ProjectInfo): Promise<void> {
-  if (exportingId.value) return
-  exportingId.value = project.id
-  try {
-    await downloadProjectPackage(project)
-    ElMessage.success('项目包已导出（最近保存的版本）')
-  } catch (error) {
-    report(error, '导出失败')
-  } finally {
-    exportingId.value = ''
-  }
-}
 </script>
 
 <template>
@@ -93,9 +62,9 @@ async function exportPackage(project: ProjectInfo): Promise<void> {
     <header class="projects__head">
       <div>
         <h1>3D场景</h1>
-        <p>搭建三维场景，配置设备数据，导出给数据大屏</p>
+        <p>搭建三维场景，配置设备数据，交给数据大屏</p>
       </div>
-      <button class="s-btn s-btn--primary" data-testid="new-project" @click="create">
+      <button class="s-btn s-btn--primary" data-testid="new-project" @click="dialog = { project: null }">
         <Plus :size="14" />新建场景
       </button>
     </header>
@@ -106,10 +75,8 @@ async function exportPackage(project: ProjectInfo): Promise<void> {
         v-for="project in [...store.projects].reverse()"
         :key="project.id"
         :project="project"
-        :exporting="exportingId === project.id"
         @edit="open"
-        @export="exportPackage"
-        @rename="rename"
+        @rename="dialog = { project: $event }"
         @remove="remove"
       />
     </div>
@@ -117,6 +84,15 @@ async function exportPackage(project: ProjectInfo): Promise<void> {
       <Box :size="28" />
       <p>还没有场景</p>
     </div>
+
+    <ProjectDialog
+      v-model="dialogOpen"
+      :title="dialog?.project ? '编辑场景信息' : '新建场景'"
+      :confirm-text="dialog?.project ? '保存' : '创建并打开'"
+      :initial="dialog?.project"
+      :busy="submitting"
+      @submit="submit"
+    />
   </section>
 </template>
 

@@ -2,14 +2,14 @@
  * 场景的数据接口：设备变量的值从哪里来。一个场景可以同时启用多个，大园区通常每个系统一个接口：
  *
  *   websocket  网关实时推送
- *   http       定时请求一个接口（没有推送服务时）
+ *   http       请求一个接口：只请求一次，或打开定时请求按间隔刷新
  *   static     手填的固定值（调试和演示：改数值，立即看效果）
  *
  * 每个接口可以限定「涉及设备」（devices），也可以用 mapping 说明返回数据的格式。所有接口都按
  * 「设备编号 + 变量名」写入同一份运行时数据，数据面板和 Viewer 不关心值从哪来。
  * 同一个变量有多个接口提供时，以列表里靠前的为准；靠前的断开后，靠后的接管。
  *
- * 场景文件会随项目包分发，所以这里不允许保存任何账号、密码或 Token：需要认证的接口用 authRef 引用，
+ * 场景 JSON 会交给后端和数据大屏，所以这里不允许保存任何账号、密码或 Token：需要认证的接口用 authRef 引用，
  * Token 由运行环境提供（见 TwinDataRuntime 的 requestHeaders）。
  */
 import { z } from 'zod'
@@ -21,7 +21,7 @@ export function looksLikeSecret(name: string): boolean {
   return /authorization|token|secret|password|passwd|cookie|session|api[-_]?key|access[-_]?key/i.test(name)
 }
 
-/** ws:// or wss:// only; credentials and fragments must never travel inside a project package. */
+/** 只能是 ws:// 或 wss://；账号密码和 # 不能写进场景 JSON。 */
 export function isSafeRealtimeUrl(value: string): boolean {
   try {
     const url = new URL(value)
@@ -109,7 +109,9 @@ const HttpDataSourceSchema = z.strictObject({
     message: '地址必须是 http(s):// 或以 / 开头，且不能包含用户名、密码、# 或 Token 参数',
   }),
   method: z.enum(['GET', 'POST']),
-  /** 请求间隔（秒）。 */
+  /** 定时请求开关：false 只在启动时请求一次；不写按 true 处理（旧场景都是定时请求）。 */
+  polling: z.boolean().optional(),
+  /** 请求间隔（秒），定时请求时才用。 */
   interval: z.number().int().min(1).max(3600),
   /** 超时（秒）；不写 = 不超过间隔，也不超过 15 秒。 */
   timeout: z.number().int().min(1).max(120).optional(),
@@ -170,11 +172,12 @@ export function newDataSource(type: ActiveDataSourceConfig['type'], id: string):
   if (type === 'http')
     return {
       id,
-      name: '定时请求',
+      name: 'HTTP 接口',
       type,
       enabled: true,
       url: '/api/devices/latest',
       method: 'GET',
+      polling: false,
       interval: 5,
       resultPath: 'data',
       withCredentials: false,

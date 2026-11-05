@@ -21,7 +21,7 @@ export type TwinRuntimeState = UnwrapNestedRefs<ReturnType<typeof createTwinStat
 
 export interface TwinDataRuntimeOptions {
   /**
-   * 定时请求接口的认证请求头。场景文件里只有引用（authRef），Token 由运行环境提供：
+   * HTTP 接口的认证请求头。场景文件里只有引用（authRef），Token 由运行环境提供：
    * Viewer SDK 由集成方传入。
    */
   requestHeaders?: (

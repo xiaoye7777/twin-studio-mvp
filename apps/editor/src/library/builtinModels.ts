@@ -2,7 +2,7 @@
  * 内置模型：卡通的（低面数）和写实的（真实米制）。作者和来源见 public/models/CREDITS.md。
  * 第一次拖进场景时才上传进资源库；后端按内容去重，重复上传也只有一份。
  */
-import { type AssetRecord, validatePortableAsset } from '@twin-studio/core'
+import type { AssetRecord } from '@twin-studio/core'
 import { assetRepository } from '@/api/repositories'
 
 export type BuiltinModelStyle = '卡通' | '写实'
@@ -49,7 +49,6 @@ export async function uploadBuiltinModel(model: BuiltinModel): Promise<AssetReco
   const response = await fetch(`${import.meta.env.BASE_URL}models/${model.file}`)
   if (!response.ok) throw new Error(`内置模型加载失败：${model.name}（HTTP ${response.status}）`)
   const bytes = new Uint8Array(await response.arrayBuffer())
-  validatePortableAsset(bytes, 'model')
   return assetRepository.saveFile(
     new File([bytes], model.file, { type: 'model/gltf-binary', lastModified: 0 }),
     'model',

@@ -6,7 +6,7 @@
  * 一次更新（apply）分五步：
  *   1. 新节点、类型变了或换了模型文件的节点：新建三维对象（模型要异步加载）
  *   2. 删除的节点、要重建的节点：从场景里移除旧对象
- *   3. 内容变了的节点（引用和上次不同）：原地更新名字、显隐和变换
+ *   3. 内容变了的节点（引用和上次不同）：原地更新名字、显隐和变换（面板的内容由 PanelLayer 画）
  *   4. 父子关系变了的节点：重新挂到新的父对象下；新的顶层对象最后交给引擎（引擎此时为它建拾取索引）
  *   5. 场景设置（天空、光照、后期）变了就更新
  *
@@ -16,6 +16,7 @@ import { Group, type Object3D } from 'three'
 import { applySceneTransform, type SceneDocumentV2, type SceneNodeV2 } from '../../domain/scene'
 import type { AssetRepository } from '../../infrastructure/assets/AssetRepository'
 import type { TwinEngine } from '../../engine/TwinEngine'
+import { PanelObject } from '../panels/PanelObject'
 import { ImportedAssetResourceRegistry } from './ImportedAssetResourceRegistry'
 import { setEditorMetadata } from './objectMetadata'
 
@@ -125,6 +126,7 @@ export class SceneSync {
     if (this.disposed) return
     this.disposed = true
     this.resources.dispose()
+    for (const { object } of this.mounted.values()) if (object instanceof PanelObject) object.dispose()
     this.mounted.clear()
     this.attachedTo.clear()
     this.topLevel.clear()
@@ -222,7 +224,7 @@ export class SceneSync {
   private sortChildren(document: SceneDocumentV2): void {
     const order = new Map(document.nodes.map((node, index) => [node.id, index]))
     for (const entry of this.mounted.values()) {
-      if (entry.node?.kind !== 'group') continue
+      if (entry.node?.kind !== 'group' && entry.node?.kind !== 'panel-group') continue
       entry.object.children.sort(
         (a, b) =>
           (order.get(a.userData.sceneNodeId as string) ?? 1e9) - (order.get(b.userData.sceneNodeId as string) ?? 1e9),
@@ -232,7 +234,8 @@ export class SceneSync {
 
   /** 为节点创建对象；模型加载失败时返回 null 并记一条警告，场景其余部分照常打开。 */
   private async build(node: SceneNodeV2, warnings: string[]): Promise<MountedNode | null> {
-    if (node.kind === 'group') return { node: null, object: this.tag(new Group(), node) }
+    if (node.kind === 'group' || node.kind === 'panel-group') return { node: null, object: this.tag(new Group(), node) }
+    if (node.kind === 'panel') return { node: null, object: this.tag(new PanelObject(), node) }
     try {
       const asset = await this.assets.get(node.model.assetId)
       this.assertActive()
@@ -267,9 +270,10 @@ export class SceneSync {
     this.mounted.delete(id)
     this.attachedTo.delete(id)
     // 模型和引擎的模型缓存共用几何体，不在这里释放；分组自己没有资源。作为节点的子对象先摘下来。
-    if (entry.node?.kind === 'group') {
+    if (entry.node?.kind === 'group' || entry.node?.kind === 'panel-group') {
       for (const child of [...entry.object.children]) if (child.userData.sceneNodeId) child.removeFromParent()
     }
+    if (entry.object instanceof PanelObject) entry.object.dispose()
   }
 
   private detach(object: Object3D): void {

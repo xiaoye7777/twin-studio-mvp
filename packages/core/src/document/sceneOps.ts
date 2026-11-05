@@ -1,10 +1,11 @@
 /*
- * 场景文档上的编辑操作（纯函数）：新建空文档、查找节点、删除（连带删掉引用它的绑定和面板实例）、复制、
+ * 场景文档上的编辑操作（纯函数）：新建空文档、查找节点、删除（连带删掉引用它的绑定）、复制、
  * 组合 / 取消组合、调整父子关系（保持世界坐标不变）。
  * 写给 Immer 草稿用（会原地修改），也可以用在普通的拷贝上。
  */
 import { Euler, Matrix4, Quaternion, Vector3 } from 'three'
 import {
+  canParent,
   createDefaultSceneSettingsV2,
   type SceneDocumentV2,
   type SceneNodeV2,
@@ -37,8 +38,6 @@ export function createEmptyDocument(projectId: string, name: string): Doc {
     nodes: [],
     bindings: [],
     bookmarks: [],
-    panelTemplates: [],
-    panels: [],
   }
 }
 
@@ -133,17 +132,23 @@ export function worldMatrixOf(doc: Doc, id: string | null): Matrix4 {
 
 // ---------------------------------------------------------------- edits (on Immer drafts)
 
-/** 删除节点和它的子树，连带删掉绑在上面的设备和面板实例。返回删除的 id。 */
+/** 删除节点和它的子树，连带删掉绑在上面的设备；关联了被删对象的面板解除关联。返回删除的 id。 */
 export function removeNodes(draft: Doc, ids: readonly string[]): Set<string> {
   const removed = new Set<string>()
   for (const id of ids) for (const nodeId of subtreeIds(draft, id)) removed.add(nodeId)
   draft.nodes = draft.nodes.filter(node => !removed.has(node.id))
   draft.bindings = draft.bindings.filter(binding => !removed.has(targetNodeId(binding.target)))
-  draft.panels = draft.panels.filter(panel => !removed.has(panel.nodeId))
+  for (const node of draft.nodes) {
+    if (node.kind === 'panel' && node.panel.targetNodeId && removed.has(node.panel.targetNodeId))
+      delete node.panel.targetNodeId
+  }
   return removed
 }
 
-/** 复制节点（含子树）放在原节点后面，面板实例跟着副本走，设备绑定不跟（一台设备只在一个地方）。返回新的顶层 id。 */
+/**
+ * 复制节点（含子树）放在原节点后面。设备绑定不跟（一台设备只在一个地方）。
+ * 面板和它关联的对象一起复制时，副本关联副本。返回新的顶层 id。
+ */
 export function duplicateNodes(draft: Doc, ids: readonly string[], offset: [number, number, number]): string[] {
   const top = topmost(draft, ids)
   const created: string[] = []
@@ -170,9 +175,10 @@ export function duplicateNodes(draft: Doc, ids: readonly string[], offset: [numb
     draft.nodes.splice(last + 1, 0, ...copies)
     created.push(remap.get(id)!)
   }
-  for (const panel of [...draft.panels]) {
-    const nodeId = remap.get(panel.nodeId)
-    if (nodeId) draft.panels.push({ ...plain(panel), id: newId('panel'), nodeId })
+  for (const copyId of remap.values()) {
+    const copy = nodeById(draft, copyId)
+    const target = copy?.kind === 'panel' ? copy.panel.targetNodeId : undefined
+    if (copy?.kind === 'panel' && target && remap.has(target)) copy.panel.targetNodeId = remap.get(target)!
   }
   return created
 }
@@ -186,7 +192,9 @@ export function uniqueName(doc: Doc, base: string): string {
 
 /** Moves nodes under a new parent, keeping where they are in the world. */
 export function reparentNodes(draft: Doc, ids: readonly string[], parentId: string | null, beforeId?: string): void {
+  const parentKind = parentId === null ? null : (nodeById(draft, parentId)?.kind ?? null)
   const moving = topmost(draft, ids).filter(id => {
+    if (!canParent(parentKind, nodeById(draft, id)!.kind)) return false
     if (parentId === null) return true
     // Never into itself or its own subtree.
     return !subtreeIds(draft, id).has(parentId)
@@ -213,7 +221,8 @@ export function reparentNodes(draft: Doc, ids: readonly string[], parentId: stri
 
 /** Wraps nodes in a new group placed at their centre. Returns the group id. */
 export function groupNodes(draft: Doc, ids: readonly string[], name = '分组'): string | null {
-  const top = topmost(draft, ids)
+  // 面板只能待在标签组里，不参与编组。
+  const top = topmost(draft, ids).filter(id => nodeById(draft, id)?.kind !== 'panel')
   if (!top.length) return null
   const parents = new Set(top.map(id => nodeById(draft, id)!.parentId))
   const parentId = parents.size === 1 ? [...parents][0]! : null
