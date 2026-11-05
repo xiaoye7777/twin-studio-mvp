@@ -1,0 +1,15 @@
+node_modules
+dist
+.DS_Store
+*.local
+*.log
+*.tgz
+.env
+.env.*
+.vscode/*
+!.vscode/extensions.json
+release
+
+# 本地模拟后端写的数据
+apps/editor/.mock-data
+.claude

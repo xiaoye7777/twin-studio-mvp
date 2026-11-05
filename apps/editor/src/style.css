@@ -1,0 +1,115 @@
+@import 'tailwindcss';
+
+/*
+ * 全局基础样式。颜色全部来自 theme/tokens.css 的设计令牌；编辑器的控件样式（按钮、输入框…）在
+ * studio/studio.css。
+ */
+
+:root {
+  font-family: var(--s-font);
+  color: var(--s-fg);
+  background: var(--s-bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--s-wash-page), var(--s-bg);
+  background-attachment: fixed;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+::selection {
+  background: var(--s-selection);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--s-scrollbar) transparent;
+}
+
+/* ---------------------------------------------------------------- Element Plus（颜色变量在 tokens.css 里映射） */
+
+.el-button {
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.el-button--primary {
+  --el-button-text-color: var(--s-on-accent);
+  --el-button-hover-text-color: var(--s-on-accent);
+  --el-button-active-text-color: var(--s-on-accent);
+  font-weight: 600;
+}
+
+.el-dialog {
+  --el-dialog-bg-color: var(--s-panel);
+  border: 1px solid var(--s-line-2);
+  border-radius: 8px;
+  box-shadow: var(--s-shadow-lg);
+}
+
+.el-dialog__header {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--s-line);
+}
+
+.el-dialog__title {
+  color: var(--s-fg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.el-dialog__footer {
+  padding-top: 12px;
+  border-top: 1px solid var(--s-line);
+}
+
+.el-drawer {
+  --el-drawer-bg-color: var(--s-panel);
+  border-left: 1px solid var(--s-line-2);
+  box-shadow: var(--s-shadow-lg);
+}
+
+.el-drawer__header {
+  margin-bottom: 0;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--s-line);
+  color: var(--s-fg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.el-drawer__body {
+  padding: 14px 16px;
+}
+
+.el-message-box {
+  --el-messagebox-border-radius: 8px;
+  border: 1px solid var(--s-line-2);
+}
+
+.el-tooltip__popper.is-dark {
+  border: 1px solid var(--s-line-2);
+  background: var(--s-raised);
+  color: var(--s-fg);
+}

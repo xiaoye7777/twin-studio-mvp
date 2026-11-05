@@ -1,0 +1,17 @@
+packages:
+  - apps/*
+  - packages/*
+
+onlyBuiltDependencies:
+  - esbuild
+  - vue-demi
+allowBuilds:
+  esbuild: true
+  vue-demi: true
+
+# Keep the workspace installable on Node 20.16, the oldest supported version. The newest releases of
+# these packages require Node 20.19; every consumer here also accepts the pinned, compatible version.
+overrides:
+  eslint-scope: 8.4.0
+  eslint-visitor-keys: 4.2.1
+  espree: 10.4.0

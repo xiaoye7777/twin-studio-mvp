@@ -1,0 +1,382 @@
+/*
+ * 编辑器的通用控件样式：面板、页签、按钮、输入框、提示文字等（类名都以 s- 开头）。
+ * 颜色只用 theme/tokens.css 里的变量，所以深色、浅色主题下都成立。
+ */
+
+.studio {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 44px minmax(0, 1fr);
+  background: var(--s-bg);
+  color: var(--s-fg);
+  font: 12px/1.45 var(--s-font);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+.studio * {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--s-scrollbar) transparent;
+}
+
+.studio ::selection {
+  background: var(--s-selection);
+}
+
+.studio input,
+.studio textarea,
+.studio select,
+.studio button {
+  font: inherit;
+  color: inherit;
+}
+
+.studio input,
+.studio textarea {
+  user-select: text;
+}
+
+/* ---------------------------------------------------------------- panels */
+
+.s-panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--s-wash), var(--s-panel);
+}
+
+.s-panel-head {
+  display: flex;
+  height: 34px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--s-line);
+}
+
+.s-tab {
+  position: relative;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--s-fg-3);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.s-tab:hover {
+  color: var(--s-fg-2);
+}
+
+.s-tab.is-active {
+  color: var(--s-fg);
+}
+
+.s-tab.is-active::after {
+  position: absolute;
+  right: 10px;
+  bottom: -1px;
+  left: 10px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--s-accent);
+  content: '';
+}
+
+.s-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.s-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 18px;
+  color: var(--s-fg-3);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.s-empty svg {
+  color: var(--s-fg-4);
+}
+
+.s-hint {
+  color: var(--s-fg-3);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.s-mono {
+  font-family: var(--s-mono);
+  font-size: 11px;
+}
+
+.s-divider {
+  height: 1px;
+  margin: 6px 0;
+  background: var(--s-line);
+}
+
+/* ---------------------------------------------------------------- controls */
+
+.s-btn {
+  display: inline-flex;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--s-line-2);
+  border-radius: var(--s-radius-sm);
+  background: var(--s-raised);
+  color: var(--s-fg);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.s-btn:hover {
+  border-color: var(--s-line-strong);
+  background: var(--s-hover);
+}
+
+.s-btn:active {
+  background: var(--s-active);
+}
+
+.s-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.s-btn--primary {
+  border-color: transparent;
+  background: var(--s-accent);
+  color: var(--s-on-accent);
+  font-weight: 600;
+}
+
+.s-btn--primary:hover {
+  border-color: transparent;
+  background: var(--s-accent-2);
+}
+
+.s-btn--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--s-fg-2);
+}
+
+.s-btn--ghost:hover {
+  background: var(--s-hover);
+  color: var(--s-fg);
+}
+
+.s-btn--danger:hover {
+  border-color: color-mix(in srgb, var(--s-danger) 50%, transparent);
+  color: var(--s-danger);
+}
+
+.s-btn--block {
+  width: 100%;
+}
+
+.s-btn--sm {
+  height: 22px;
+  padding: 0 7px;
+  font-size: 11px;
+}
+
+.s-icon-btn {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  place-items: center;
+  border: 0;
+  border-radius: var(--s-radius-sm);
+  background: transparent;
+  color: var(--s-fg-2);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.s-icon-btn:hover {
+  background: var(--s-hover);
+  color: var(--s-fg);
+}
+
+.s-icon-btn.is-active {
+  background: var(--s-accent-soft);
+  color: var(--s-accent-2);
+}
+
+.s-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: transparent;
+}
+
+.s-input,
+.s-select,
+.s-textarea {
+  width: 100%;
+  height: 26px;
+  min-width: 0;
+  padding: 0 8px;
+  border: 1px solid var(--s-line-2);
+  border-radius: var(--s-radius-sm);
+  background: var(--s-field);
+  color: var(--s-fg);
+  font-size: 12px;
+  outline: none;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.s-textarea {
+  height: auto;
+  min-height: 52px;
+  padding: 6px 8px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.s-select {
+  appearance: none;
+  padding-right: 22px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238895a0' stroke-width='1.4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  cursor: pointer;
+}
+
+.s-select option {
+  background: var(--s-panel-2);
+}
+
+.s-input:hover,
+.s-select:hover,
+.s-textarea:hover {
+  border-color: var(--s-line-strong);
+}
+
+.s-input:focus,
+.s-select:focus,
+.s-textarea:focus {
+  border-color: var(--s-accent-line);
+  box-shadow: 0 0 0 2px var(--s-accent-soft);
+}
+
+.s-kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 4px;
+  border: 1px solid var(--s-line-2);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  color: var(--s-fg-2);
+  font-family: var(--s-mono);
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+}
+
+.s-badge {
+  display: inline-flex;
+  height: 18px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--s-raised);
+  color: var(--s-fg-2);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.s-badge--accent {
+  background: var(--s-accent-soft);
+  color: var(--s-accent-2);
+}
+
+.s-badge--ok {
+  background: color-mix(in srgb, var(--s-ok) 14%, transparent);
+  color: var(--s-ok);
+}
+
+.s-badge--warn {
+  background: color-mix(in srgb, var(--s-warn) 14%, transparent);
+  color: var(--s-warn);
+}
+
+.s-badge--danger {
+  background: color-mix(in srgb, var(--s-danger) 15%, transparent);
+  color: var(--s-danger);
+}
+
+.s-badge--data {
+  background: color-mix(in srgb, var(--s-data) 14%, transparent);
+  color: var(--s-data);
+}
+
+.s-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Floating chrome over the viewport. */
+.s-float {
+  border: 1px solid var(--s-float-line);
+  border-radius: 8px;
+  background: var(--s-float);
+  box-shadow: var(--s-shadow);
+  backdrop-filter: blur(10px);
+}
+
+/* ---------------------------------------------------------------- 属性面板里常用的小块 */
+
+/* 只读的值：一行，过长省略 */
+.s-value {
+  overflow: hidden;
+  color: var(--s-fg-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 分组里的说明文字 */
+.s-note {
+  margin: 4px 0 0;
+  padding: 0 12px;
+}
+
+/* 分组底部的一排按钮 */
+.s-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 12px 2px;
+}

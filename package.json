@@ -1,0 +1,30 @@
+{
+  "name": "twin-studio-mvp",
+  "private": true,
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=20.16.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @twin-studio/editor dev",
+    "build:viewer": "pnpm --filter @twin-studio/viewer build",
+    "pack:viewer": "pnpm build:viewer && pnpm --filter @twin-studio/viewer pack --pack-destination release",
+    "type-check": "pnpm --filter \"./apps/*\" --filter \"./packages/*\" type-check",
+    "build": "pnpm build:viewer && pnpm --filter @twin-studio/editor build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:unit": "pnpm --filter @twin-studio/core test"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "eslint": "9.39.5",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-vue": "10.11.1",
+    "globals": "17.12.0",
+    "prettier": "3.9.9",
+    "typescript-eslint": "8.55.0"
+  },
+  "type": "module"
+}

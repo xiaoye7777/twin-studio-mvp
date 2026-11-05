@@ -1,0 +1,35 @@
+{
+  "name": "@twin-studio/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared Twin Studio domain, package format and runtime (internal; bundled into @twin-studio/viewer)",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "camera-controls": "2.10.1",
+    "fflate": "0.8.3",
+    "immer": "11.1.18",
+    "postprocessing": "6.39.5",
+    "three-mesh-bvh": "0.9.16",
+    "zod": "4.6.5"
+  },
+  "peerDependencies": {
+    "three": "0.184.0",
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/three": "0.184.0",
+    "three": "0.184.0",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7",
+    "vue": "3.5.25"
+  }
+}

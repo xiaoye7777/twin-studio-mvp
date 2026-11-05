@@ -1,0 +1,37 @@
+{
+  "name": "@twin-studio/editor",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=20.16.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "pnpm run type-check && vite build",
+    "preview": "vite preview",
+    "type-check": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "2.3.2",
+    "@twin-studio/core": "workspace:*",
+    "@twin-studio/viewer": "workspace:*",
+    "element-plus": "2.11.8",
+    "lucide-vue-next": "1.0.0",
+    "pinia": "3.0.4",
+    "three": "0.184.0",
+    "vue": "3.5.25",
+    "vue-router": "4.6.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.1.17",
+    "@types/node": "24.10.1",
+    "@types/three": "0.184.0",
+    "@vitejs/plugin-vue": "5.2.4",
+    "tailwindcss": "4.1.17",
+    "typescript": "5.9.3",
+    "vite": "6.4.3",
+    "vue-tsc": "3.1.5"
+  }
+}

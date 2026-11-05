@@ -1,0 +1,202 @@
+/*
+ * 设计令牌（Design tokens）——整个编辑器界面唯一的颜色来源。
+ *
+ * 组件里只写 var(--s-xxx)，不写具体色值。一个主题 = 下面一段 [data-theme='…'] 变量块，
+ * 新增主题只需复制一段改色值，并在 themes.ts 里登记一行。
+ *
+ * 命名约定：
+ *   --s-bg / panel / panel-2 / raised / field   背景层级：页面 → 面板 → 次级面板 → 浮起元素 → 输入框
+ *   --s-hover / active                          悬停、按下
+ *   --s-line / line-2                           分隔线、边框
+ *   --s-fg / fg-2 / fg-3                        文字：主要、次要、辅助
+ *   --s-accent*                                 主题色（按钮、选中、焦点）
+ *   --s-wash / wash-bar / wash-page             面板、顶栏、页面背景上的淡渐变（叠在背景色之上）
+ *   --s-ok / warn / danger / data               状态色：正常、警告、错误、数据（信息）
+ *
+ * 不跟随主题的：三维视口里的场景、数据大屏画布里的组件——那是用户的作品，颜色由用户决定。
+ */
+
+/* ---------------------------------------------------------------- 深色（默认） */
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --s-bg: #191d22;
+  --s-panel: #20252a;
+  --s-panel-2: #262c32;
+  --s-raised: #2d343b;
+  --s-field: #171b1f;
+  --s-hover: #2f363d;
+  --s-active: #384048;
+  --s-line: #2e353b;
+  --s-line-2: #3b434a;
+  --s-line-strong: #545e68;
+
+  --s-fg: #e4e9ec;
+  --s-fg-2: #aab4bc;
+  --s-fg-3: #7c8892;
+  --s-fg-4: #56606a;
+
+  /* 主题色：沉稳的青蓝 */
+  --s-accent: #2a9cb3;
+  --s-accent-2: #4fb8cc;
+  --s-accent-soft: rgb(42 156 179 / 0.16);
+  --s-accent-line: rgb(42 156 179 / 0.55);
+  --s-on-accent: #ffffff;
+
+  --s-ok: #5cb88a;
+  --s-warn: #d8a845;
+  --s-danger: #e0665c;
+  --s-data: #6fb3e0;
+
+  --s-x: #d8695e;
+  --s-y: #8bbd6b;
+  --s-z: #6c9ad6;
+
+  /* 编辑区与浮层 */
+  --s-canvas: #14171b;
+  --s-canvas-dot: rgb(255 255 255 / 0.06);
+  --s-ruler: #1d2126;
+  --s-float: rgb(32 37 42 / 0.88);
+  --s-float-line: rgb(255 255 255 / 0.07);
+  --s-overlay: rgb(5 7 9 / 0.6);
+  --s-selection: rgb(42 156 179 / 0.35);
+  --s-scrollbar: #424c55;
+  --s-shadow: 0 10px 30px rgb(0 0 0 / 0.42), 0 1px 0 rgb(255 255 255 / 0.03) inset;
+  --s-shadow-lg: 0 24px 64px rgb(0 0 0 / 0.55);
+
+  /* 画布辅助线：吸附线、标尺参考线 */
+  --s-knob: #f4f6f8;
+  --s-snap: #f472b6;
+  --s-guide: #a78bfa;
+  /* 场景树里各类节点的图标色 */
+  --s-kind-model: #c9b28f;
+  --s-kind-group: #c7a35a;
+  --s-kind-path: #5fc7e8;
+  --s-kind-area: #5cc4ae;
+  --s-kind-label: #e8a26c;
+  --s-kind-light: #f0d070;
+  --s-kind-part: #9d8f7a;
+
+  /* 淡淡的主题色渐变：不抢注意力，只让大面积的面板不至于一片死色 */
+  --s-wash: linear-gradient(180deg, rgb(72 170 190 / 0.055) 0, transparent 240px);
+  --s-wash-bar: linear-gradient(90deg, rgb(72 170 190 / 0.1) 0, transparent 46%);
+  --s-wash-page:
+    radial-gradient(1200px 640px at 8% -10%, rgb(72 170 190 / 0.1), transparent 62%),
+    radial-gradient(900px 560px at 104% 108%, rgb(96 124 186 / 0.07), transparent 60%);
+}
+
+/* ---------------------------------------------------------------- 浅色 */
+[data-theme='light'] {
+  color-scheme: light;
+
+  --s-bg: #d9e0e4;
+  --s-panel: #e6ebee;
+  --s-panel-2: #dfe5e9;
+  --s-raised: #eef2f4;
+  --s-field: #f0f3f5;
+  --s-hover: #d8dfe4;
+  --s-active: #cdd6dc;
+  --s-line: #d0d8dd;
+  --s-line-2: #bfcad1;
+  --s-line-strong: #97a5af;
+
+  --s-fg: #25323b;
+  --s-fg-2: #4a5964;
+  --s-fg-3: #627079;
+  --s-fg-4: #98a5ae;
+
+  --s-accent: #1d7f95;
+  --s-accent-2: #16687b;
+  --s-accent-soft: rgb(29 127 149 / 0.13);
+  --s-accent-line: rgb(29 127 149 / 0.45);
+  --s-on-accent: #ffffff;
+
+  --s-ok: #2e8b5a;
+  --s-warn: #a87412;
+  --s-danger: #c8453b;
+  --s-data: #2a74b0;
+
+  --s-x: #c8453b;
+  --s-y: #4f8a32;
+  --s-z: #3b6fb8;
+
+  --s-canvas: #cfd7dc;
+  --s-canvas-dot: rgb(20 40 60 / 0.09);
+  --s-ruler: #e1e6ea;
+  --s-float: rgb(232 237 240 / 0.9);
+  --s-float-line: rgb(30 60 75 / 0.12);
+  --s-overlay: rgb(20 30 40 / 0.35);
+  --s-selection: rgb(29 127 149 / 0.22);
+  --s-scrollbar: #b6c1c8;
+  --s-shadow: 0 10px 30px rgb(20 40 60 / 0.12), 0 1px 2px rgb(20 40 60 / 0.06);
+  --s-shadow-lg: 0 24px 64px rgb(20 40 60 / 0.18);
+
+  --s-knob: #f4f7f8;
+  --s-snap: #d63d8c;
+  --s-guide: #7c5cd6;
+  --s-kind-model: #8a6d3f;
+  --s-kind-group: #9a7420;
+  --s-kind-path: #1f86a8;
+  --s-kind-area: #1f8c76;
+  --s-kind-label: #b8642a;
+  --s-kind-light: #a8860c;
+  --s-kind-part: #7a6a54;
+
+  --s-wash: linear-gradient(180deg, rgb(29 127 149 / 0.07) 0, transparent 260px);
+  --s-wash-bar: linear-gradient(90deg, rgb(29 127 149 / 0.13) 0, transparent 50%);
+  --s-wash-page:
+    radial-gradient(1200px 640px at 8% -10%, rgb(29 127 149 / 0.16), transparent 62%),
+    radial-gradient(900px 560px at 104% 108%, rgb(70 100 160 / 0.1), transparent 60%);
+}
+
+/* ---------------------------------------------------------------- 与主题无关的常量 */
+:root {
+  --s-radius: 6px;
+  --s-radius-sm: 4px;
+  --s-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+  --s-font:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei',
+    sans-serif;
+}
+
+/* ---------------------------------------------------------------- Element Plus 跟随主题
+   （Element Plus 自带的深色样式写在 html.dark 上，这里同样写上它，并在其后加载，才能覆盖） */
+:root,
+html.dark {
+  --el-color-primary: var(--s-accent);
+  --el-color-primary-light-3: color-mix(in srgb, var(--s-accent) 70%, var(--s-panel));
+  --el-color-primary-light-5: color-mix(in srgb, var(--s-accent) 50%, var(--s-panel));
+  --el-color-primary-light-7: color-mix(in srgb, var(--s-accent) 30%, var(--s-panel));
+  --el-color-primary-light-8: color-mix(in srgb, var(--s-accent) 20%, var(--s-panel));
+  --el-color-primary-light-9: color-mix(in srgb, var(--s-accent) 10%, var(--s-panel));
+  --el-color-primary-dark-2: var(--s-accent-2);
+  --el-color-success: var(--s-ok);
+  --el-color-warning: var(--s-warn);
+  --el-color-danger: var(--s-danger);
+  --el-color-error: var(--s-danger);
+
+  --el-bg-color: var(--s-panel);
+  --el-bg-color-page: var(--s-bg);
+  --el-bg-color-overlay: var(--s-panel-2);
+  --el-fill-color-blank: var(--s-field);
+  --el-fill-color: var(--s-raised);
+  --el-fill-color-light: var(--s-hover);
+  --el-fill-color-lighter: var(--s-panel-2);
+  --el-mask-color: var(--s-overlay);
+
+  --el-border-color: var(--s-line-2);
+  --el-border-color-light: var(--s-line);
+  --el-border-color-lighter: var(--s-line);
+  --el-border-color-hover: var(--s-line-strong);
+
+  --el-text-color-primary: var(--s-fg);
+  --el-text-color-regular: var(--s-fg-2);
+  --el-text-color-secondary: var(--s-fg-3);
+  --el-text-color-placeholder: var(--s-fg-3);
+  --el-text-color-disabled: var(--s-fg-4);
+
+  --el-border-radius-base: 4px;
+  --el-font-size-base: 12px;
+  --el-box-shadow-light: var(--s-shadow);
+}
