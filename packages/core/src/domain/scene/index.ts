@@ -20,8 +20,8 @@ export {
   SceneDocumentSchemaV2,
   SceneNodeSchemaV2,
 } from './sceneSchemaV2'
-export { createDefaultSceneSettingsV2, SceneSettingsSchemaV2 } from './sceneSettingsV2'
-export type { SceneSettingsV2, SkyMode } from './sceneSettingsV2'
+export { createDefaultSceneSettingsV2, SceneSettingsSchemaV2, scenePresets } from './sceneSettingsV2'
+export type { SceneSettingsV2, SkyMode, WeatherKind } from './sceneSettingsV2'
 export type { LoadedSceneDocument, SceneDocument } from './sceneVersioning'
 export type {
   CameraBookmark,

@@ -27,6 +27,7 @@ import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
 import { Sky } from 'three/examples/jsm/objects/Sky.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import type { SceneSettingsV2 } from '../domain/scene/sceneSettingsV2'
+import { Weather } from './Weather'
 
 /** Sun direction for a time of day: rises in the east at 6, peaks at noon, sets in the west at 18. */
 export function sunDirection(hour: number, azimuthDegrees: number, target = new Vector3()): Vector3 {
@@ -133,7 +134,7 @@ export interface AtmosphereApplyOptions {
   shadowMapSize: number
 }
 
-/** Sky, sun and moon, ambient light, ground, fog and image-based lighting. */
+/** Sky, sun and moon, ambient light, ground, fog, weather and image-based lighting. */
 export class Atmosphere {
   private readonly hemisphere = new HemisphereLight(0xffffff, 0x444444, 1)
   private readonly sun = new DirectionalLight(0xffffff, 2)
@@ -144,6 +145,8 @@ export class Atmosphere {
   /** Extends the ground to the horizon, where fog takes over; the sky never shows below the horizon. */
   private readonly floor: Mesh<CircleGeometry, MeshStandardMaterial>
   private readonly pmrem: PMREMGenerator
+  /** 雨雪粒子，跟着镜头的观察点走。 */
+  private readonly weather = new Weather()
   private readonly envScene = new Scene()
   private readonly envPhysical = createSky(this.skyBrightness)
   private readonly envGradient: Mesh<SphereGeometry, ShaderMaterial>
@@ -212,6 +215,7 @@ export class Atmosphere {
       this.gradientSky,
       this.floor,
       this.ground,
+      this.weather.object,
     ]) {
       object.userData.editorInternal = true
       object.raycast = () => {}
@@ -223,7 +227,7 @@ export class Atmosphere {
   async apply(settings: SceneSettingsV2, options: AtmosphereApplyOptions): Promise<void> {
     if (this.disposed) return
     this.settings = settings
-    const { sky, time, lighting, fog, ground, post } = settings
+    const { sky, time, lighting, fog, ground, post, weather } = settings
     sunDirection(time.hour, time.azimuth, this.direction)
     const colors = mixPalette(this.direction.y)
     const night = 1 - colors.day
@@ -306,7 +310,7 @@ export class Atmosphere {
       this.scene.environment = this.room.texture
     } else this.scheduleEnvironment()
 
-    // Ground, fog, exposure.
+    // Ground, fog, exposure, weather.
     this.ground.visible = ground.enabled
     this.ground.scale.setScalar(ground.size)
     this.ground.material.color.set(ground.color)
@@ -317,6 +321,7 @@ export class Atmosphere {
     this.scene.fog = fog.enabled ? new FogExp2(fogColor, 0) : null
     this.fitFog()
     this.renderer.toneMappingExposure = post.exposure
+    this.weather.configure(weather.kind, weather.intensity)
   }
 
   /** Shadows cover the scene content; call when its bounds change. */
@@ -335,12 +340,13 @@ export class Atmosphere {
     fog.density = (this.settings.fog.density * 0.9) / (radius * 2)
   }
 
-  /** Per frame: keeps the sky around the camera and animates clouds. */
-  update(delta: number, cameraPosition: Vector3): void {
+  /** 每帧：天空跟着镜头，云和雨雪动起来；雨雪围绕镜头的观察点 focus。 */
+  update(delta: number, cameraPosition: Vector3, focus: Vector3): void {
     this.physicalSky.position.copy(cameraPosition)
     this.gradientSky.position.copy(cameraPosition)
     const uniforms = this.physicalSky.material.uniforms
     uniforms.time!.value += delta
+    this.weather.update(delta, focus)
   }
 
   private fitShadow(): void {
@@ -407,8 +413,10 @@ export class Atmosphere {
       this.gradientSky,
       this.floor,
       this.ground,
+      this.weather.object,
     ])
       object.removeFromParent()
+    this.weather.dispose()
     this.floor.geometry.dispose()
     this.floor.material.dispose()
     this.physicalSky.geometry.dispose()

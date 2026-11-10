@@ -15,6 +15,8 @@ import {
   type SceneDocumentV2,
   type SceneNodeV2,
   type SceneRepository,
+  type SceneSettingsV2,
+  scenePresets,
   SceneSync,
   targetNodeId,
   topmost,
@@ -189,6 +191,17 @@ export class EditorSession {
 
   redo(): void {
     if (this.ui.mode === 'edit') this.store.redo()
+  }
+
+  /** 改场景环境（天空、光照、雾、天气等）。拖滑块时传 coalesceKey，松手前合并成一步撤销。 */
+  updateSettings(recipe: (settings: SceneSettingsV2) => void, label = '场景设置', coalesceKey?: string): void {
+    this.edit(label, draft => recipe(draft.settings), { coalesceKey })
+  }
+
+  /** 套用一个氛围预设，算一步撤销。 */
+  applyPreset(id: string): void {
+    const preset = scenePresets.find(item => item.id === id)
+    if (preset) this.edit(`氛围：${preset.name}`, draft => void (draft.settings = preset.apply(draft.settings)))
   }
 
   node(id: string): SceneNodeV2 | undefined {

@@ -81,6 +81,8 @@ export class TwinEngine {
   private lastInfo = { calls: 0, triangles: 0 }
   private elapsed = 0
   private readonly raycaster = new Raycaster()
+  /** 镜头观察点，每帧复用，给雨雪定位。 */
+  private readonly weatherFocus = new Vector3()
   private readonly pickables = new Set<Object3D>()
   private readonly frameListeners = new Set<(delta: number, elapsed: number) => void>()
   private readonly adaptive: AdaptiveQuality
@@ -439,7 +441,7 @@ export class TwinEngine {
       this.updateContentBounds()
       this.atmosphere.setContentBounds(this.contentBounds)
     }
-    this.atmosphere.update(delta, this.camera.position)
+    this.atmosphere.update(delta, this.camera.position, this.rig.controls.getTarget(this.weatherFocus))
     for (const listener of this.frameListeners) listener(delta, elapsed)
     this.renderer.info.reset()
     this.pipeline.render(delta)

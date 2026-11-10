@@ -6,6 +6,8 @@ export function createShellState() {
     leftTab: 'scene' as 'scene' | 'cameras',
     /** 选中对象时右栏的页签。 */
     nodeTab: 'properties' as 'properties' | 'data',
+    /** 什么都没选时右栏的页签。 */
+    sceneTab: 'environment' as 'environment' | 'data',
     dialog: null as 'batch-bind' | null,
     /** 场景树里正在改名的节点。 */
     renaming: null as string | null,

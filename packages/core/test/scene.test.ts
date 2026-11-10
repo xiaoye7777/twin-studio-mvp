@@ -10,7 +10,13 @@ import {
   worldMatrixOf,
 } from '../src/document/sceneOps'
 import { createPanelTemplate } from '../src/domain/panels'
-import { canParent, loadSceneDocument, SceneDocumentError, SceneDocumentVersionError } from '../src/domain/scene'
+import {
+  canParent,
+  loadSceneDocument,
+  SceneDocumentError,
+  SceneDocumentVersionError,
+  scenePresets,
+} from '../src/domain/scene'
 import type { SceneDocumentV2, SceneNodeV2 } from '../src/domain/scene'
 
 function model(id: string, position: [number, number, number] = [0, 0, 0]): SceneNodeV2 {
@@ -70,6 +76,36 @@ describe('loadSceneDocument', () => {
     expect(document.dataSources).toEqual([])
     expect(document).not.toHaveProperty('effects')
     expect(dropped).toHaveLength(1)
+  })
+
+  it('scenes saved before weather existed open with clear weather', () => {
+    const document = documentWith(model('a'))
+    const { weather: _weather, ...settings } = document.settings
+    const loaded = loadSceneDocument({ ...document, settings }).document
+    expect(loaded.settings.weather).toEqual({ kind: 'none', intensity: 0.6 })
+  })
+
+  it('keeps the weather it saved', () => {
+    const document = documentWith(model('a'))
+    document.settings.weather = { kind: 'snow', intensity: 0.4 }
+    expect(loadSceneDocument(JSON.parse(JSON.stringify(document))).document.settings.weather).toEqual({
+      kind: 'snow',
+      intensity: 0.4,
+    })
+  })
+})
+
+describe('scene presets', () => {
+  it('change the look but leave the ground and weather alone', () => {
+    const settings = createEmptyDocument('p', '场景').settings
+    settings.weather = { kind: 'rain', intensity: 0.8 }
+    for (const preset of scenePresets) {
+      const next = preset.apply(settings)
+      expect(next.ground).toEqual(settings.ground)
+      expect(next.weather).toEqual(settings.weather)
+      // 预设的结果仍然是合法的场景设置。
+      expect(() => loadSceneDocument({ ...createEmptyDocument('p', '场景'), settings: next })).not.toThrow()
+    }
   })
 })
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** 右栏：选中对象时是属性和数据；选中标签组时是模板配置；什么都没选时是场景的数据接口。 */
+/** 右栏：选中对象时是属性和数据；选中标签组时是模板配置；什么都没选时是场景的环境和数据接口。 */
 import { computed } from 'vue'
 import { nodeKindLabels, useSession } from '@/studio/context'
 import { useShell } from '@/studio/shell'
@@ -7,6 +7,7 @@ import NodeData from './inspector/NodeData.vue'
 import NodeProperties from './inspector/NodeProperties.vue'
 import PanelGroupInspector from './inspector/PanelGroupInspector.vue'
 import SceneData from './inspector/SceneData.vue'
+import SceneEnvironment from './inspector/SceneEnvironment.vue'
 
 const session = useSession()
 const shell = useShell()
@@ -22,6 +23,10 @@ const title = computed(() => {
 })
 const nodeTabs = [
   { id: 'properties', label: '属性' },
+  { id: 'data', label: '数据' },
+] as const
+const sceneTabs = [
+  { id: 'environment', label: '环境' },
   { id: 'data', label: '数据' },
 ] as const
 </script>
@@ -42,7 +47,18 @@ const nodeTabs = [
           {{ tab.label }}
         </button>
       </template>
-      <span v-else class="s-tab is-active">数据</span>
+      <template v-else>
+        <button
+          v-for="tab in sceneTabs"
+          :key="tab.id"
+          class="s-tab"
+          :class="{ 'is-active': shell.sceneTab === tab.id }"
+          :data-testid="`scene-tab-${tab.id}`"
+          @click="shell.sceneTab = tab.id"
+        >
+          {{ tab.label }}
+        </button>
+      </template>
       <span class="inspector__title">{{ title }}</span>
     </div>
     <div class="s-scroll">
@@ -51,6 +67,7 @@ const nodeTabs = [
         <NodeProperties v-if="shell.nodeTab === 'properties'" :nodes="nodes" />
         <NodeData v-else :nodes="nodes" />
       </template>
+      <SceneEnvironment v-else-if="shell.sceneTab === 'environment'" />
       <SceneData v-else />
     </div>
   </aside>
