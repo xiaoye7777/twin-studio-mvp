@@ -1,5 +1,6 @@
 import { Box3, Matrix4, Vector3 } from 'three'
 import {
+  type DeviceTemplate,
   createPanelTemplate,
   dataOwnerOf,
   identityTransform,
@@ -18,7 +19,6 @@ import {
   uniqueName,
   worldMatrixOf,
 } from '@twin-studio/core'
-import type { DeviceTemplate } from '../deviceTemplates'
 import type { EditorSession } from '../EditorSession'
 import { bindingOf, writeBinding } from './DeviceData'
 

@@ -6,6 +6,7 @@ import type { ProjectInfo } from '@/api/adapter'
 import { assetRepository, HttpSceneRepository, projectApi } from '@/api/repositories'
 import AssetDock from '@/components/studio/AssetDock.vue'
 import BatchBindDialog from '@/components/studio/BatchBindDialog.vue'
+import DeviceTypeManager from '@/components/studio/DeviceTypeManager.vue'
 import InspectorPanel from '@/components/studio/InspectorPanel.vue'
 import LeftPanel from '@/components/studio/LeftPanel.vue'
 import StudioViewport from '@/components/studio/StudioViewport.vue'
@@ -83,6 +84,7 @@ onBeforeUnmount(() => {
       </div>
       <InspectorPanel v-if="session?.ui.ready && !preview" class="studio__right" />
     </div>
+    <DeviceTypeManager v-if="session?.ui.ready && shell.managingDeviceTypes" />
     <BatchBindDialog v-if="session?.ui.ready" />
   </div>
 </template>

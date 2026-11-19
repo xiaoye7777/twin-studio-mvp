@@ -1,5 +1,7 @@
 import {
   type ActiveDataSourceConfig,
+  type DeviceTemplate,
+  DeviceTemplatesSchema,
   bindingsForSource,
   type DataSourceProbeResult,
   dataOwnerOf,
@@ -21,7 +23,8 @@ import {
   type TwinVariableDefinition,
   type WebSocketDataSourceConfig,
 } from '@twin-studio/core'
-import { deviceIdFor, deviceVariables, type DeviceTemplate } from '../deviceTemplates'
+import { ref } from 'vue'
+import { defaultDeviceTemplates, deviceIdFor, deviceVariables } from '../deviceTemplates'
 import type { EditorSession } from '../EditorSession'
 
 /** 场景里的一台设备。设备来自绑定：同一个设备编号可以绑定到多个对象，这里合并成一台。 */
@@ -96,6 +99,39 @@ export function writeBinding(
  */
 export class DeviceData {
   constructor(private readonly session: EditorSession) {}
+
+  private readonly preferredTemplate = ref('')
+
+  get templates(): readonly DeviceTemplate[] {
+    return this.session.doc.value.deviceTemplates ?? defaultDeviceTemplates
+  }
+
+  get selectedTemplate(): DeviceTemplate | undefined {
+    return this.templates.find(template => template.id === this.preferredTemplate.value) ?? this.templates[0]
+  }
+
+  selectTemplate(id: string): void {
+    this.preferredTemplate.value = id
+  }
+
+  saveTemplate(template: DeviceTemplate): void {
+    const templates = [...this.templates]
+    const index = templates.findIndex(item => item.id === template.id)
+    if (index < 0) templates.push(template)
+    else templates[index] = template
+    const result = DeviceTemplatesSchema.safeParse(templates)
+    if (!result.success) throw new Error(result.error.issues[0]!.message)
+    this.session.edit(index < 0 ? '添加设备类型' : '修改设备类型', draft => {
+      draft.deviceTemplates = result.data
+    })
+    this.selectTemplate(template.id)
+  }
+
+  removeTemplate(id: string): void {
+    this.session.edit('删除设备类型', draft => {
+      draft.deviceTemplates = this.templates.filter(template => template.id !== id)
+    })
+  }
 
   bindingFor(nodeId: string): TwinBinding | undefined {
     return bindingOf(this.session.doc.value, nodeId)

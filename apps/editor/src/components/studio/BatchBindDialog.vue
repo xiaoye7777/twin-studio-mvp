@@ -4,7 +4,7 @@ import { ElMessage } from 'element-plus'
 import { computed, reactive, watch } from 'vue'
 import UiNumber from '@/components/ui/UiNumber.vue'
 import { useSession } from '@/studio/context'
-import { deviceIdFor, deviceTemplates } from '@/studio/deviceTemplates'
+import { deviceIdFor } from '@/studio/deviceTemplates'
 import { useShell } from '@/studio/shell'
 
 const session = useSession()
@@ -15,20 +15,15 @@ const visible = computed({
     if (!value) shell.dialog = null
   },
 })
-const bind = reactive({
-  templateId: deviceTemplates[0]!.id,
-  prefix: deviceTemplates[0]!.prefix,
-  start: 1,
-  name: deviceTemplates[0]!.name,
-})
+const devices = session.devices
+const bind = reactive({ prefix: '', start: 1, name: '' })
 watch(
-  () => bind.templateId,
-  id => {
-    const template = deviceTemplates.find(item => item.id === id)
-    if (!template) return
-    bind.prefix = template.prefix
-    bind.name = template.name
+  [() => devices.selectedTemplate?.id, () => devices.selectedTemplate?.prefix, () => devices.selectedTemplate?.name],
+  ([, prefix, name]) => {
+    bind.prefix = prefix ?? ''
+    bind.name = name ?? ''
   },
+  { immediate: true },
 )
 const preview = computed(() => {
   const count = session.selection.value.length
@@ -38,7 +33,7 @@ const preview = computed(() => {
 })
 
 function run(): void {
-  const template = deviceTemplates.find(item => item.id === bind.templateId)
+  const template = devices.selectedTemplate
   if (!template || !bind.prefix.trim()) return
   // 按场景树里的顺序编号，编号就和布局一致。
   const order = new Map(session.doc.value.nodes.map((node, index) => [node.id, index]))
@@ -59,9 +54,19 @@ function run(): void {
   <el-dialog v-model="visible" title="批量绑定设备" width="440px" append-to-body class="studio-dialog">
     <div class="form">
       <label>设备类型</label>
-      <select v-model="bind.templateId" class="s-select" data-testid="batch-template">
-        <option v-for="template in deviceTemplates" :key="template.id" :value="template.id">{{ template.name }}</option>
+      <select
+        :value="devices.selectedTemplate?.id ?? ''"
+        class="s-select"
+        data-testid="batch-template"
+        @change="devices.selectTemplate(($event.target as HTMLSelectElement).value)"
+      >
+        <option v-if="!devices.templates.length" value="">暂无设备类型</option>
+        <option v-for="template in devices.templates" :key="template.id" :value="template.id">
+          {{ template.name }}
+        </option>
       </select>
+      <span />
+      <button class="s-btn s-btn--sm manage" @click="shell.managingDeviceTypes = true">管理设备类型</button>
       <label>编号前缀</label>
       <input v-model="bind.prefix" class="s-input s-mono" data-testid="batch-prefix" />
       <label>起始编号</label>
@@ -74,7 +79,14 @@ function run(): void {
     </p>
     <template #footer>
       <button class="s-btn" @click="shell.dialog = null">取消</button>
-      <button class="s-btn s-btn--primary" data-testid="dialog-confirm" @click="run">确定</button>
+      <button
+        class="s-btn s-btn--primary"
+        data-testid="dialog-confirm"
+        :disabled="!devices.selectedTemplate || !bind.prefix.trim()"
+        @click="run"
+      >
+        确定
+      </button>
     </template>
   </el-dialog>
 </template>
@@ -89,6 +101,9 @@ function run(): void {
 .form label {
   color: var(--s-fg-2);
   font-size: 12px;
+}
+.manage {
+  justify-self: start;
 }
 .preview {
   margin: 14px 0 0;

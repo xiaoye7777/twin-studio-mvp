@@ -10,6 +10,8 @@ export type {
   TwinVariableDefinition,
 } from './twinTypes'
 export {
+  type DeviceTemplate,
+  DeviceTemplatesSchema,
   TwinBindingSchema,
   TwinBindingTargetSchema,
   TwinDeviceSchema,

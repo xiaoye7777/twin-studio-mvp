@@ -1,13 +1,13 @@
 <script setup lang="ts">
 /** 选中对象时右栏的「数据」页签：绑定设备、变量、当前值；多选时批量绑定。 */
 import { Plus, Radio, Trash2, Unlink } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { newId, type SceneNodeV2, type TwinVariableDefinition } from '@twin-studio/core'
 import UiRow from '@/components/ui/UiRow.vue'
 import UiSection from '@/components/ui/UiSection.vue'
 import UiText from '@/components/ui/UiText.vue'
 import { useSession } from '@/studio/context'
-import { deviceIdFor, deviceTemplates, deviceVariables } from '@/studio/deviceTemplates'
+import { deviceIdFor, deviceVariables } from '@/studio/deviceTemplates'
 import { useShell } from '@/studio/shell'
 import StaticValueInput from './StaticValueInput.vue'
 
@@ -19,7 +19,7 @@ const binding = computed(() => {
   void session.doc.value
   return node.value ? session.devices.bindingFor(node.value.id) : undefined
 })
-const templateId = ref(deviceTemplates[0]!.id)
+const devices = session.devices
 /** 现在有值的变量数。 */
 const live = computed(() => {
   void session.twin.runtimeRevision
@@ -46,7 +46,7 @@ const boundCount = computed(() => props.nodes.filter(item => session.devices.bin
 
 function bind(): void {
   const n = node.value
-  const template = deviceTemplates.find(item => item.id === templateId.value)
+  const template = devices.selectedTemplate
   if (!n || !template) return
   const used = new Set(session.doc.value.bindings.map(item => item.device.id))
   let index = 1
@@ -120,14 +120,25 @@ function removeVariable(index: number): void {
           <span class="s-hint">绑定后，数据接口的数值会显示在信息面板上，并在点击时交给数据大屏</span>
         </div>
         <UiRow label="设备类型">
-          <select v-model="templateId" class="s-select" data-testid="bind-template">
-            <option v-for="template in deviceTemplates" :key="template.id" :value="template.id">
+          <select
+            :value="devices.selectedTemplate?.id ?? ''"
+            class="s-select"
+            data-testid="bind-template"
+            @change="devices.selectTemplate(($event.target as HTMLSelectElement).value)"
+          >
+            <option v-if="!devices.templates.length" value="">暂无设备类型</option>
+            <option v-for="template in devices.templates" :key="template.id" :value="template.id">
               {{ template.name }}（{{ template.variables.length }} 个变量）
             </option>
           </select>
         </UiRow>
         <div class="data__actions">
-          <button class="s-btn s-btn--primary" data-testid="bind-device" @click="bind">
+          <button
+            class="s-btn s-btn--primary"
+            data-testid="bind-device"
+            :disabled="!devices.selectedTemplate"
+            @click="bind"
+          >
             <Plus :size="13" />绑定设备
           </button>
         </div>
@@ -148,8 +159,18 @@ function removeVariable(index: number): void {
           <UiText :model-value="binding.device.name" @commit="updateDevice('name', $event)" />
         </UiRow>
         <UiRow label="类型">
-          <UiText :model-value="binding.device.type ?? ''" mono @commit="updateDevice('type', $event)" />
+          <UiText
+            :model-value="binding.device.type ?? ''"
+            mono
+            list="scene-device-types"
+            @commit="updateDevice('type', $event)"
+          />
         </UiRow>
+        <datalist id="scene-device-types">
+          <option v-for="template in devices.templates" :key="template.id" :value="template.type">
+            {{ template.name }}
+          </option>
+        </datalist>
         <UiRow label="数据">
           <span class="s-badge" :class="connected ? 's-badge--ok' : 's-badge--warn'">
             <span class="s-dot" />{{ sourceLabel }}

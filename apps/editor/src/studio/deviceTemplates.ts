@@ -1,14 +1,4 @@
-import type { TwinVariableDefinition } from '@twin-studio/core'
-
-export interface DeviceTemplate {
-  id: string
-  name: string
-  /** 写进设备绑定的设备类型。 */
-  type: string
-  /** 批量绑定时默认的编号前缀，如 "ESS-" → ESS-001。 */
-  prefix: string
-  variables: Omit<TwinVariableDefinition, 'id'>[]
-}
+import type { DeviceTemplate, TwinVariableDefinition } from '@twin-studio/core'
 
 const v = (key: string, name: string, dataType: TwinVariableDefinition['dataType'], unit?: string) => ({
   key,
@@ -18,7 +8,7 @@ const v = (key: string, name: string, dataType: TwinVariableDefinition['dataType
 })
 
 /** 零碳园区常见的设备类型，变量是常见网关会上报的那些。 */
-export const deviceTemplates: readonly DeviceTemplate[] = [
+export const defaultDeviceTemplates: readonly DeviceTemplate[] = [
   {
     id: 'ess',
     name: '储能柜',

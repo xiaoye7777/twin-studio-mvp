@@ -50,6 +50,23 @@ describe('loadSceneDocument', () => {
     expect(loadSceneDocument(JSON.parse(JSON.stringify(document))).document).toEqual(document)
   })
 
+  it('preserves a scene’s device templates, including an explicitly empty catalog', () => {
+    const document = documentWith(model('a'))
+    const pump = {
+      id: 'pump',
+      type: 'water-pump',
+      name: '水泵',
+      prefix: 'P-',
+      variables: [{ key: 'flow', name: '流量', dataType: 'number', unit: 'm³/h' }],
+    }
+    expect(loadSceneDocument(document).document.deviceTemplates).toBeUndefined()
+    for (const catalog of [[pump], []]) {
+      const saved = JSON.stringify({ ...document, deviceTemplates: catalog })
+      expect(loadSceneDocument(JSON.parse(saved)).document.deviceTemplates).toEqual(catalog)
+    }
+    expect(() => loadSceneDocument({ ...document, deviceTemplates: [pump, { ...pump, id: 'other' }] })).toThrow('重复')
+  })
+
   it('refuses a newer format with an upgrade hint', () => {
     expect(() => loadSceneDocument({ version: 3 })).toThrow(SceneDocumentVersionError)
   })

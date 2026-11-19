@@ -13,7 +13,6 @@ import UiSegmented from '@/components/ui/UiSegmented.vue'
 import UiSwitch from '@/components/ui/UiSwitch.vue'
 import UiText from '@/components/ui/UiText.vue'
 import { useSession } from '@/studio/context'
-import { deviceTemplates } from '@/studio/deviceTemplates'
 
 const props = defineProps<{ node: PanelGroupNodeV2 }>()
 const session = useSession()
@@ -46,7 +45,7 @@ function deviceOf(panelId: string): string {
 
 function applyDeviceType(event: Event): void {
   const select = event.target as HTMLSelectElement
-  const type = deviceTemplates.find(item => item.id === select.value)
+  const type = session.devices.templates.find(item => item.id === select.value)
   if (type) panels.applyDeviceType(props.node.id, type)
   select.value = ''
 }
@@ -116,7 +115,7 @@ function togglePlacing(): void {
       <UiRow label="套用设备" hint="按设备类型填好字段，会替换现有字段">
         <select class="s-select" data-testid="template-device-type" @change="applyDeviceType">
           <option value="">选择设备类型…</option>
-          <option v-for="type in deviceTemplates" :key="type.id" :value="type.id">{{ type.name }}</option>
+          <option v-for="type in session.devices.templates" :key="type.id" :value="type.id">{{ type.name }}</option>
         </select>
       </UiRow>
     </UiSection>

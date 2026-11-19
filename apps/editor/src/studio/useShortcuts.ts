@@ -11,6 +11,7 @@ export function useStudioShortcuts(session: ShallowRef<EditorSession | null>, on
   const onKeyDown = (event: KeyboardEvent) => {
     const s = session.value
     if (!s?.ui.ready || typing(event.target)) return
+    if (event.target instanceof Element && event.target.closest('[role="dialog"], [role="alertdialog"]')) return
     const mod = event.ctrlKey || event.metaKey
     const key = event.key.toLowerCase()
     const run = (action: () => void) => {

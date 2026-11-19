@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { ProjectDataSourcesSchema } from '../dataSources'
 import { PanelInstanceSchema, PanelTemplateSchema } from '../panels'
 import { nonEmptyString, uniqueBy } from '../schemaHelpers'
-import { TwinBindingSchema } from '../twin'
+import { DeviceTemplatesSchema, TwinBindingSchema } from '../twin'
 import { SceneTransformSchema, Vector3TupleSchema } from './sceneSchema'
 import { SceneSettingsSchemaV2 } from './sceneSettingsV2'
 
@@ -131,6 +131,8 @@ export const SceneDocumentSchemaV2 = z.object({
   cameraView: CameraViewSchemaV2.optional(),
   nodes: z.array(SceneNodeSchemaV2).superRefine(checkHierarchy),
   bindings: z.array(TwinBindingSchema),
+  /** 缺省时编辑器提供内置类型；空数组表示已全部删除。 */
+  deviceTemplates: DeviceTemplatesSchema.optional(),
   bookmarks: z
     .array(CameraBookmarkSchema)
     .max(200)

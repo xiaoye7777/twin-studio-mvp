@@ -59,7 +59,14 @@ const sceneTabs = [
           {{ tab.label }}
         </button>
       </template>
-      <span class="inspector__title">{{ title }}</span>
+      <button
+        v-if="panelGroup || (nodes.length ? shell.nodeTab : shell.sceneTab) === 'data'"
+        class="s-btn s-btn--sm inspector__manage"
+        @click="shell.managingDeviceTypes = true"
+      >
+        管理设备类型
+      </button>
+      <span v-else class="inspector__title">{{ title }}</span>
     </div>
     <div class="s-scroll">
       <PanelGroupInspector v-if="panelGroup" :key="panelGroup.id" :node="panelGroup" />
@@ -74,6 +81,9 @@ const sceneTabs = [
 </template>
 
 <style scoped>
+.inspector__manage {
+  margin-left: auto;
+}
 .inspector__title {
   overflow: hidden;
   margin-left: auto;
