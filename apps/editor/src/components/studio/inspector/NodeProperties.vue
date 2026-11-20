@@ -48,6 +48,12 @@ const rows = computed(() => allRows.filter(row => node.value?.kind !== 'panel' |
 
     <UiSection v-if="node" title="变换">
       <UiRow v-for="row in rows" :key="row.key" :label="row.label">
+        <template v-if="row.key === 'scale'" #label>
+          {{ row.label }}
+          <label class="scale-lock" title="按当前 X、Y、Z 比例联动数值">
+            <input v-model="session.ui.lockScaleRatio" type="checkbox" />锁定比例
+          </label>
+        </template>
         <UiNumber
           v-for="(axis, index) in axes"
           :key="axis.label"
@@ -56,6 +62,7 @@ const rows = computed(() => allRows.filter(row => node.value?.kind !== 'panel' |
           :label-color="axis.color"
           :step="row.step"
           :precision="row.precision"
+          :disabled="row.key === 'scale' && session.ui.lockScaleRatio && session.nodes.scaleBasis(node)[index] === 0"
           :data-testid="`${row.key}-${axis.label}`"
           @update="session.nodes.setTransformValue(node!.id, row.key, index, $event / row.factor)"
           @commit="session.commit()"
@@ -66,3 +73,17 @@ const rows = computed(() => allRows.filter(row => node.value?.kind !== 'panel' |
     <PanelInstanceFields v-if="node?.kind === 'panel'" :key="node.id" :node="node" />
   </div>
 </template>
+
+<style scoped>
+.scale-lock {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.scale-lock input {
+  margin: 0;
+  accent-color: var(--s-accent);
+}
+</style>

@@ -81,6 +81,7 @@ export class EditorSession {
     warnings: [] as string[],
     mode: 'edit' as 'edit' | 'preview',
     tool: 'translate' as EditorTool,
+    lockScaleRatio: true,
     canUndo: false,
     canRedo: false,
     undoLabel: '',
@@ -130,10 +131,17 @@ export class EditorSession {
     this.store = new DocumentStore(createEmptyDocument(deps.projectId, deps.projectName), 300)
     this.resolver = new BindingTargetResolver(id => this.sync.objectFor(id))
     this.dataRuntime = new TwinDataRuntime(this.twin, this.resolver)
+    let dragStart: SceneDocumentV2 | null = null
     this.gizmo = new TransformGizmo(this.engine, {
-      onStart: () => {},
+      onStart: () => (dragStart = this.store.document),
       onChange: ({ worlds }) => this.applyGizmo(worlds),
-      onEnd: () => this.store.seal(),
+      onScale: (factor, center) => {
+        if (dragStart) this.applyUniformScale(dragStart, factor, center)
+      },
+      onEnd: () => {
+        dragStart = null
+        this.store.seal()
+      },
     })
     this.gizmo.setMode('translate')
     this.panelLayer = new PanelLayer(this.engine, id => this.sync.objectFor(id), this.twin)
@@ -452,6 +460,32 @@ export class EditorSession {
           if (!node || !world) return
           node.transform = transformOf(worldMatrixOf(draft, node.parentId).invert().multiply(world))
         })
+      },
+      { coalesceKey: `gizmo:${ids.join(',')}` },
+    )
+  }
+
+  private applyUniformScale(start: SceneDocumentV2, factor: number, center: Vector3): void {
+    const ids = this.gizmoIds
+    this.edit(
+      '缩放',
+      draft => {
+        for (const id of ids) {
+          const original = nodeById(start, id)
+          const node = nodeById(draft, id)
+          if (!node || !original) continue
+          node.transform.scale = new Vector3(...original.transform.scale).multiplyScalar(factor).toArray()
+          if (ids.length === 1) continue
+          // 多选围绕共同中心缩放。先将中心换算到父节点坐标，保留节点原有旋转和各轴符号。
+          const parent = worldMatrixOf(start, original.parentId)
+          if (parent.determinant() === 0) continue
+          const pivot = center.clone().applyMatrix4(parent.invert())
+          node.transform.position = new Vector3(...original.transform.position)
+            .sub(pivot)
+            .multiplyScalar(factor)
+            .add(pivot)
+            .toArray()
+        }
       },
       { coalesceKey: `gizmo:${ids.join(',')}` },
     )

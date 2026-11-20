@@ -4,7 +4,9 @@ defineProps<{ label?: string; hint?: string; stack?: boolean }>()
 
 <template>
   <div class="ui-row" :class="{ 'is-stack': stack }">
-    <span v-if="label" class="ui-row__label" :title="hint || label">{{ label }}</span>
+    <span v-if="label" class="ui-row__label" :title="hint || label"
+      ><slot name="label">{{ label }}</slot></span
+    >
     <div class="ui-row__control"><slot /></div>
   </div>
 </template>

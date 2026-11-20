@@ -20,7 +20,7 @@ const tools: Array<{ id: EditorTool; icon: unknown; label: string; key: string }
   { id: 'select', icon: MousePointer2, label: '选择', key: 'Q' },
   { id: 'translate', icon: Move, label: '移动', key: 'W' },
   { id: 'rotate', icon: Rotate3d, label: '旋转', key: 'E' },
-  { id: 'scale', icon: Scaling, label: '缩放', key: 'R' },
+  { id: 'scale', icon: Scaling, label: '等比缩放', key: 'R' },
 ]
 const placingGroup = computed(() => (ui.value?.placing ? session.value?.node(ui.value.placing) : null))
 

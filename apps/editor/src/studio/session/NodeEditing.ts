@@ -27,6 +27,7 @@ import type { EditorSession } from '../EditorSession'
 export class NodeEditing {
   /** 复制的节点，以及它们的中心（「粘贴到这里」要用）。 */
   private clipboard: { nodes: SceneNodeV2[]; center: Vector3 | null } | null = null
+  private readonly collapsedScales = new Map<string, SceneTransform['scale']>()
 
   constructor(private readonly session: EditorSession) {}
 
@@ -114,13 +115,31 @@ export class NodeEditing {
       )
   }
 
-  /** 改变换的一个分量。连续拖动数值合并成一步撤销。 */
+  /** 缩到零后仍能在当前编辑器中按原比例放大。旧文档三个轴全零时从等边比例开始。 */
+  scaleBasis(node: SceneNodeV2): SceneTransform['scale'] {
+    const scale = node.transform.scale
+    return scale.some(value => value !== 0) ? scale : (this.collapsedScales.get(node.id) ?? [1, 1, 1])
+  }
+
+  /** 连续拖动数值合并成一步撤销。 */
   setTransformValue(id: string, key: keyof SceneTransform, axis: number, value: number): void {
     this.session.edit(
       '修改变换',
       draft => {
         const node = nodeById(draft, id)
-        if (node) node.transform[key][axis] = value
+        if (!node) return
+        if (key === 'scale' && this.session.ui.lockScaleRatio) {
+          const basis = this.scaleBasis(node)
+          const previous = basis[axis]
+          if (!previous) return
+          const scale = new Vector3(...basis).multiplyScalar(value / previous).toArray()
+          if (!scale.every(Number.isFinite)) return
+          if (value === 0) this.collapsedScales.set(id, [...basis])
+          scale[axis] = value
+          node.transform.scale = scale
+        } else {
+          node.transform[key][axis] = value
+        }
       },
       { coalesceKey: `transform:${id}:${key}:${axis}` },
     )
