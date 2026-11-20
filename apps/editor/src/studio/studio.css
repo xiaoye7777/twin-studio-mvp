@@ -51,6 +51,7 @@
 }
 
 .s-panel-head {
+  background: var(--s-section-head, transparent);
   display: flex;
   height: 34px;
   flex-shrink: 0;

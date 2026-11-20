@@ -55,6 +55,7 @@ const menu = computed<MenuSections>(() => [
 
 <style scoped>
 .card {
+  box-shadow: var(--s-card-shadow, none);
   overflow: hidden;
   border: 1px solid var(--s-line);
   border-radius: 10px;
@@ -99,6 +100,7 @@ const menu = computed<MenuSections>(() => [
   opacity: 1;
 }
 .card__body {
+  box-shadow: inset 0 1px var(--s-card-divider, transparent);
   display: flex;
   align-items: center;
   gap: 8px;

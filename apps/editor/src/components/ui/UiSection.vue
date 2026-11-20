@@ -32,6 +32,7 @@ const expanded = ref(props.open)
   border-bottom: 1px solid var(--s-line);
 }
 .ui-section__head {
+  background: var(--s-section-head, transparent);
   display: flex;
   height: 32px;
   align-items: center;

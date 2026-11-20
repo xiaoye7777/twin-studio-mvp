@@ -82,6 +82,7 @@ function drag(event: DragEvent): void {
 </template>
 <style scoped>
 .model-card {
+  box-shadow: var(--s-card-shadow, none);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -104,6 +105,7 @@ function drag(event: DragEvent): void {
   object-fit: contain;
 }
 .body {
+  box-shadow: inset 0 1px var(--s-card-divider, transparent);
   display: flex;
   align-items: center;
   justify-content: space-between;

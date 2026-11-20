@@ -90,28 +90,33 @@
 [data-theme='light'] {
   color-scheme: light;
 
-  /* 不是纯白：灰蓝的中间调，长时间看不刺眼。 */
-  --s-bg: #a9b5bc;
-  --s-panel: #bcc6cc;
-  --s-panel-2: #b3bec5;
-  --s-raised: #c7d0d5;
-  --s-field: #ccd4d9;
-  --s-hover: #aebac1;
-  --s-active: #a1aeb6;
-  --s-line: #a3afb7;
-  --s-line-2: #94a2ab;
-  --s-line-strong: #71808b;
+  /* 页面、预览底板、内容面板分别用三个明度层级。 */
+  --s-bg: #edf1f4;
+  --s-panel: #ffffff;
+  --s-panel-2: #f1f5f7;
+  --s-raised: #f9fbfc;
+  --s-field: #ffffff;
+  --s-hover: #eaf0f3;
+  --s-active: #dde7ec;
+  --s-line: #c6d1d8;
+  --s-line-2: #aabac4;
+  --s-line-strong: #758b99;
 
-  --s-fg: #17222a;
-  --s-fg-2: #2f3e49;
-  --s-fg-3: #3b4a56;
-  --s-fg-4: #6b7a85;
+  --s-fg: #192c38;
+  --s-fg-2: #405562;
+  --s-fg-3: #526673;
+  --s-fg-4: #6c7d88;
 
-  --s-accent: #136a7e;
-  --s-accent-2: #0c4c5b;
-  --s-accent-soft: rgb(19 106 126 / 0.18);
-  --s-accent-line: rgb(19 106 126 / 0.55);
+  --s-accent: #086d77;
+  --s-accent-2: #07555e;
+  --s-accent-soft: #dcefeb;
+  --s-accent-line: #73aea9;
   --s-on-accent: #ffffff;
+
+  --s-nav-marker: var(--s-accent);
+  --s-card-shadow: 0 1px 3px rgb(27 50 64 / 0.09);
+  --s-card-divider: #d3dde2;
+  --s-section-head: #f4f7f8;
 
   --s-ok: #135a35;
   --s-warn: #684503;
@@ -122,11 +127,11 @@
   --s-y: #3b6f22;
   --s-z: #2b5a9e;
 
-  --s-canvas: #9eabb3;
+  --s-canvas: #e3e9ed;
   --s-canvas-dot: rgb(20 40 60 / 0.12);
-  --s-ruler: #b3bec5;
-  --s-float: rgb(196 206 212 / 0.92);
-  --s-float-line: rgb(30 60 75 / 0.18);
+  --s-ruler: #e9eff2;
+  --s-float: #ffffff;
+  --s-float-line: #b3c1ca;
   --s-overlay: rgb(20 30 40 / 0.42);
   --s-selection: rgb(19 106 126 / 0.28);
   --s-scrollbar: #8795a0;
@@ -144,15 +149,9 @@
   --s-kind-light: #836807;
   --s-kind-part: #5e5040;
 
-  /* 纹理：细密的颗粒加很淡的斜线，叠在面板和页面背景上，大面积的颜色才不会显得一片死白。 */
-  --s-texture:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .1 0 0 0 0 .16 0 0 0 0 .2 0 0 0 .5 -.08'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E"),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cpath d='M-1 1l2-2M0 8l8-8M7 9l2-2' stroke='%23182a36' stroke-opacity='.05' stroke-width='1'/%3E%3C/svg%3E");
-  --s-wash: var(--s-texture), linear-gradient(180deg, rgb(19 106 126 / 0.09) 0, transparent 260px);
-  --s-wash-bar: var(--s-texture), linear-gradient(90deg, rgb(19 106 126 / 0.16) 0, transparent 50%);
-  --s-wash-page:
-    var(--s-texture), radial-gradient(1200px 640px at 8% -10%, rgb(19 106 126 / 0.2), transparent 62%),
-    radial-gradient(900px 560px at 104% 108%, rgb(50 80 140 / 0.14), transparent 60%);
+  --s-wash: none;
+  --s-wash-bar: none;
+  --s-wash-page: none;
 }
 
 /* ---------------------------------------------------------------- 与主题无关的常量 */

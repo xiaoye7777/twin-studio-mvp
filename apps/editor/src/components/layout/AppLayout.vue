@@ -87,6 +87,7 @@ const nav = [
   color: var(--s-fg);
 }
 .home__link.is-active {
+  box-shadow: inset 3px 0 var(--s-nav-marker, transparent);
   background: var(--s-accent-soft);
   color: var(--s-accent-2);
 }
