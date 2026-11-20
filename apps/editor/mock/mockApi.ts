@@ -10,6 +10,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Plugin } from 'vite'
+import catalog from '../public/models/catalog.json'
 
 const DATA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '.mock-data')
 
@@ -30,6 +31,9 @@ interface Asset {
   assetType: string
   mimeType: string
   size: number
+  title?: string
+  scale?: number
+  thumbnailUrl?: string
   sha256: string
   lastModified: number
   createdAt: string
@@ -76,8 +80,45 @@ function writeProjects(projects: Project[]): void {
   writeFileSync(projectsFile(), JSON.stringify(projects, null, 2))
 }
 
+const thumbFile = (id: string) => file('thumbnails', id)
+const thumbUrl = (id: string) => `/api/v1/assets/${id}/thumbnail`
+
+function writeAssets(assets: Asset[]): void {
+  writeFileSync(assetsFile(), JSON.stringify({ version: 1, assets }, null, 2))
+}
+
 function readAssets(): Asset[] {
-  return readJson<Asset[]>(assetsFile(), [])
+  const stored = readJson<Asset[] | { version: 1; assets: Asset[] }>(assetsFile(), [])
+  if (!Array.isArray(stored)) return stored.assets
+  // 首次打开或升级旧数组时一次性导入，按内容复用已入库的 ID；之后删除的条目不会重新出现。
+  const dir = fileURLToPath(new URL('../public/models/', import.meta.url))
+  const seeds: Asset[] = []
+  for (const model of catalog) {
+    const bytes = readFileSync(join(dir, model.file))
+    const sha256 = createHash('sha256').update(bytes).digest('hex')
+    let asset = stored.find(item => item.assetType === 'model' && item.sha256 === sha256)
+    if (!asset) {
+      asset = {
+        id: `asset_${randomUUID()}`,
+        name: model.file,
+        assetType: 'model',
+        mimeType: 'model/gltf-binary',
+        size: bytes.length,
+        sha256,
+        lastModified: 0,
+        createdAt: new Date(0).toISOString(),
+      }
+      seeds.unshift(asset)
+    }
+    asset.title ??= model.title
+    asset.scale = model.scale ?? 1
+    writeFileSync(contentFile(asset.id), bytes)
+    writeFileSync(thumbFile(asset.id), readFileSync(join(dir, 'thumbs', model.file.replace(/\.glb$/, '.webp'))))
+    asset.thumbnailUrl = thumbUrl(asset.id)
+  }
+  const assets = [...seeds, ...stored]
+  writeAssets(assets)
+  return assets
 }
 
 function readBody(request: IncomingMessage): Promise<Buffer> {
@@ -212,9 +253,8 @@ async function handleAssets(
   query: URLSearchParams,
 ): Promise<Reply | Buffer> {
   const [id, section] = parts
-  const assets = readAssets()
   if (!id) {
-    if (request.method === 'GET') return ok([...assets].reverse())
+    if (request.method === 'GET') return ok(readAssets().reverse())
     if (request.method === 'POST') {
       const contentType = request.headers['content-type'] ?? ''
       const body = new Uint8Array(await readBody(request))
@@ -225,14 +265,34 @@ async function handleAssets(
       const bytes = Buffer.from(await upload.arrayBuffer())
       if (bytes.length > 128 * 1024 ** 2) return fail(413, 41300, '文件超过 128 MiB 限制')
       // GLB 文件头是 glTF。
-      if (assetType === 'model' && bytes.subarray(0, 4).toString() !== 'glTF')
+      if (
+        assetType === 'model' &&
+        (bytes.length < 20 ||
+          bytes.toString('ascii', 0, 4) !== 'glTF' ||
+          bytes.readUInt32LE(4) !== 2 ||
+          bytes.readUInt32LE(8) !== bytes.length)
+      )
         return fail(422, 42201, `${upload.name} 不是有效的 GLB 文件`)
       const sha256 = createHash('sha256').update(bytes).digest('hex')
+      const title = String(form.get('title') ?? upload.name.replace(/\.glb$/i, '')).trim()
+      if (!title || title.length > 100) return fail(400, 40000, '标题须为 1–100 个字符')
+      const preview = form.get('thumbnail')
+      const thumbnail = preview instanceof File ? Buffer.from(await preview.arrayBuffer()) : null
+      if (thumbnail && !validThumbnail(thumbnail)) return fail(400, 40000, '缩略图必须是 512 KiB 以内的 PNG 图片')
+      const assets = readAssets()
       const existing = assets.find(item => item.assetType === assetType && item.sha256 === sha256)
-      if (existing) return ok({ isNew: false, asset: existing })
+      if (existing) {
+        if (!existing.thumbnailUrl && thumbnail) {
+          writeFileSync(thumbFile(existing.id), thumbnail)
+          existing.thumbnailUrl = thumbUrl(existing.id)
+          writeAssets(assets)
+        }
+        return ok({ isNew: false, asset: existing })
+      }
       const asset: Asset = {
         id: `asset_${randomUUID()}`,
         name: upload.name,
+        title,
         assetType,
         mimeType: assetType === 'model' ? 'model/gltf-binary' : 'image/vnd.radiance',
         size: bytes.length,
@@ -241,14 +301,41 @@ async function handleAssets(
         createdAt: new Date().toISOString(),
       }
       writeFileSync(contentFile(asset.id), bytes)
-      writeFileSync(assetsFile(), JSON.stringify([...assets, asset], null, 2))
+      if (thumbnail) {
+        writeFileSync(thumbFile(asset.id), thumbnail)
+        asset.thumbnailUrl = thumbUrl(asset.id)
+      }
+      writeAssets([...assets, asset])
       return ok({ isNew: true, asset }, 201)
     }
     return fail(405, 40000, '不支持的请求方法')
   }
+  const raw = request.method === 'PATCH' || request.method === 'PUT' ? await readBody(request) : null
+  const assets = readAssets()
   const asset = assets.find(item => item.id === id)
   if (!asset) return fail(404, 40400, '资源不存在')
   if (section === 'content') return readFileSync(contentFile(asset.id))
+  if (section === 'thumbnail') {
+    if (request.method === 'GET' && asset.thumbnailUrl) return readFileSync(thumbFile(asset.id))
+    if (request.method === 'PUT' && raw) {
+      if (!validThumbnail(raw)) return fail(400, 40000, '缩略图必须是 512 KiB 以内的 PNG 图片')
+      if (!asset.thumbnailUrl) {
+        writeFileSync(thumbFile(asset.id), raw)
+        asset.thumbnailUrl = thumbUrl(asset.id)
+        writeAssets(assets)
+      }
+      return ok(asset)
+    }
+    return fail(404, 40400, '没有缩略图')
+  }
+  if (!section && request.method === 'PATCH' && raw) {
+    const { title } = JSON.parse(raw.toString())
+    if (typeof title !== 'string' || !title.trim() || title.trim().length > 100)
+      return fail(400, 40000, '标题须为 1–100 个字符')
+    asset.title = title.trim()
+    writeAssets(assets)
+    return ok(asset)
+  }
   if (section === 'usages') return ok({ projects: usagesOf(asset.id), components: [], versionCount: 0 })
   if (request.method === 'GET') return ok(asset)
   if (request.method === 'DELETE') {
@@ -256,17 +343,15 @@ async function handleAssets(
     if (projects.length && query.get('force') !== 'true')
       return fail(409, 40902, '资源正在被使用', { projects, components: [], versionCount: 0 })
     rmSync(contentFile(asset.id), { force: true })
-    writeFileSync(
-      assetsFile(),
-      JSON.stringify(
-        assets.filter(item => item.id !== asset.id),
-        null,
-        2,
-      ),
-    )
+    rmSync(thumbFile(asset.id), { force: true })
+    writeAssets(assets.filter(item => item.id !== asset.id))
     return ok(null)
   }
   return fail(405, 40000, '不支持的请求方法')
+}
+
+function validThumbnail(bytes: Buffer): boolean {
+  return bytes.length <= 512 * 1024 && bytes.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))
 }
 
 function sendJson(response: ServerResponse, reply: Reply): void {
@@ -296,7 +381,14 @@ export function mockApi(): Plugin {
             if (resource === 'assets') {
               const reply = await handleAssets(request, parts, url.searchParams)
               if (!Buffer.isBuffer(reply)) return sendJson(response, reply)
-              response.setHeader('Content-Type', 'application/octet-stream')
+              response.setHeader(
+                'Content-Type',
+                parts[1] === 'thumbnail'
+                  ? reply.toString('ascii', 0, 4) === 'RIFF'
+                    ? 'image/webp'
+                    : 'image/png'
+                  : 'application/octet-stream',
+              )
               response.setHeader('Content-Length', reply.length)
               response.setHeader('Cache-Control', 'private, max-age=31536000, immutable')
               return response.end(reply)

@@ -4,14 +4,12 @@ import { ElMessage } from 'element-plus'
 import { Expand, Focus, MousePointer2, Move, Rotate3d, Scaling } from 'lucide-vue-next'
 import { computed, inject, ref } from 'vue'
 import { ASSET_DRAG_MIME, readAssetDrag } from '@/library/assetDrag'
-import { getBuiltinModel, uploadBuiltinModel } from '@/library/builtinModels'
 import { SessionKey } from '@/studio/context'
 import type { EditorTool } from '@/studio/EditorSession'
 import ViewportMenu from './ViewportMenu.vue'
 
 const canvas = ref<HTMLCanvasElement>()
 const sessionRef = inject(SessionKey)!
-const placing = ref(false)
 const dropping = ref(false)
 defineExpose({ canvas })
 
@@ -33,27 +31,21 @@ function onDragOver(event: DragEvent): void {
   dropping.value = true
 }
 
-async function onDrop(event: DragEvent): Promise<void> {
+function onDrop(event: DragEvent): void {
   event.preventDefault()
   dropping.value = false
   const current = session.value
   const payload = readAssetDrag(event.dataTransfer)
-  if (!current?.ui.ready || !payload || !editing.value) return
-  const point = current.engine.pointAt(event.clientX, event.clientY)
-  placing.value = true
+  if (!current?.ui.ready || payload?.type !== 'asset' || !editing.value) return
   try {
-    if (payload.type === 'asset') {
-      current.nodes.addModel(payload.assetId, payload.name, point)
-      return
-    }
-    const model = getBuiltinModel(payload.modelKey)
-    if (!model) return
-    const asset = await uploadBuiltinModel(model)
-    current.nodes.addModel(asset.id, model.name, point, model.scale ?? 1)
+    current.nodes.addModel(
+      payload.assetId,
+      payload.name,
+      current.engine.pointAt(event.clientX, event.clientY),
+      payload.scale,
+    )
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '放置模型失败')
-  } finally {
-    placing.value = false
   }
 }
 </script>
@@ -130,7 +122,6 @@ async function onDrop(event: DragEvent): Promise<void> {
       </template>
       <template v-else><span class="viewport__spinner" />正在加载场景…</template>
     </div>
-    <div v-if="placing" role="status" class="viewport__busy"><span class="viewport__spinner" />正在放置模型…</div>
     <div v-if="ui?.warnings.length" role="status" class="viewport__warning">{{ ui.warnings.join('；') }}</div>
   </div>
 </template>
@@ -239,18 +230,7 @@ async function onDrop(event: DragEvent): Promise<void> {
   color: var(--s-danger);
   font-size: 14px;
 }
-.viewport__busy {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  background: var(--s-float);
-  transform: translateX(-50%);
-}
+
 .viewport__spinner {
   width: 14px;
   height: 14px;

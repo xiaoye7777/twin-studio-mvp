@@ -11,7 +11,14 @@ import {
   type SceneDocument,
   type SceneRepository,
 } from '@twin-studio/core'
-import { adapter, type AssetInfo, type CoverSelection, type ProjectInfo, type SceneConflict } from './adapter'
+import {
+  adapter,
+  type AssetInfo,
+  type CoverSelection,
+  type ModelPresentation,
+  type ProjectInfo,
+  type SceneConflict,
+} from './adapter'
 import { ApiError, download, request } from './http'
 
 // ---------------------------------------------------------------- 项目
@@ -106,8 +113,19 @@ function toRecord(info: AssetInfo, blob: Blob): AssetRecord {
   return { ...info, fingerprint: info.id, blob }
 }
 
-function toMetadata({ id, name, mimeType, size, createdAt, assetType }: AssetInfo): AssetMetadata {
-  return { id, name, mimeType, size, createdAt, assetType }
+export interface LibraryModel extends AssetMetadata {
+  title: string
+  thumbnailUrl: string | null
+  scale: number
+}
+
+function toMetadata(info: AssetInfo): LibraryModel & AssetInfo {
+  return {
+    ...info,
+    title: info.title ?? info.name.replace(/\.glb$/i, ''),
+    thumbnailUrl: info.thumbnailUrl ?? null,
+    scale: info.scale ?? 1,
+  }
 }
 
 /** 资源文件内容不可变，同一个 id 下载一次就够了。 */
@@ -115,12 +133,41 @@ export class HttpAssetRepository implements AssetRepository {
   private readonly cache = new Map<string, Promise<AssetRecord | null>>()
 
   async saveFile(file: File, assetType: AssetType = 'model'): Promise<AssetRecord> {
-    const uploaded = adapter.toUploadedAsset(
-      await request(adapter.assetsPath(), { method: 'POST', body: adapter.uploadAssetForm(file, assetType) }),
+    const { asset } = await this.uploadFile(file, assetType)
+    return toRecord(asset, file)
+  }
+
+  async uploadFile(file: File, assetType: AssetType, presentation?: ModelPresentation) {
+    const result = adapter.toUploadedAsset(
+      await request(adapter.assetsPath(), {
+        method: 'POST',
+        body: adapter.uploadAssetForm(file, assetType, presentation),
+      }),
     )
-    const record = toRecord(uploaded, file)
-    this.cache.set(uploaded.id, Promise.resolve(record))
-    return record
+    return { isNew: result.isNew, asset: toMetadata(result.asset) }
+  }
+
+  async rename(id: string, title: string): Promise<LibraryModel> {
+    return toMetadata(
+      adapter.toAsset(
+        await request(adapter.assetPath(id), {
+          method: 'PATCH',
+          json: adapter.renameAssetBody(title),
+        }),
+      ),
+    )
+  }
+
+  async saveThumbnail(id: string, thumbnail: Blob): Promise<LibraryModel> {
+    return toMetadata(
+      adapter.toAsset(
+        await request(adapter.assetThumbnailPath(id), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'image/png' },
+          body: thumbnail,
+        }),
+      ),
+    )
   }
 
   get(assetId: string): Promise<AssetRecord | null> {
@@ -146,7 +193,7 @@ export class HttpAssetRepository implements AssetRepository {
     }
   }
 
-  async listMetadata(): Promise<AssetMetadata[]> {
+  async listMetadata(): Promise<LibraryModel[]> {
     return adapter.toAssets(await request(adapter.assetsPath())).map(toMetadata)
   }
 

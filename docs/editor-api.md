@@ -23,6 +23,8 @@
 | POST | `/assets` | 上传资源 |
 | GET | `/assets/{assetId}` | 资源信息 |
 | GET | `/assets/{assetId}/content` | 下载文件 |
+| PATCH | `/assets/{assetId}` | 修改模型标题 |
+| GET / PUT | `/assets/{assetId}/thumbnail` | 读取缩略图 / 补全旧模型的缩略图 |
 | GET | `/assets/{assetId}/usages` | 查询被哪些场景引用 |
 | DELETE | `/assets/{assetId}` | 删除资源 |
 
@@ -154,12 +156,15 @@ JSON 接口都用下面的包装，`code` 为 `0` 表示成功。HTTP 状态码�
 
 ## 5. 模型资源
 
-资源库跨场景共享。
+资源库跨场景共享。资源页和编辑器都直接使用同一份列表。首次初始化时，从 `apps/editor/public/models/catalog.json` 导入随项目附带的模型、展示标题、默认缩放和已有 WebP 缩略图。真实后端也需要执行一次导入；升级时按 SHA-256 匹配并保留已有 ID，不按文件名合并。请记录初始化完成状态，以免已删除的模型重启后重新出现。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `id` | string | 后端生成 |
 | `name` | string | 原始文件名，如 `cabinet.glb` |
+| `title` | string | 可编辑的展示标题（1–100 个字符）；旧记录缺省时显示去掉扩展名的文件名 |
+| `thumbnailUrl` | string 或 null | 可直接加载的小图地址；缺少缩略图时可为空 |
+| `scale` | number | 拖入场景的默认缩放，缺省为 1 |
 | `assetType` | string | 当前只有 `model` |
 | `mimeType` | string | `model/gltf-binary` |
 | `size` | number | 字节数 |
@@ -169,7 +174,7 @@ JSON 接口都用下面的包装，`code` 为 `0` 表示成功。HTTP 状态码�
 
 ### 5.1 `POST /assets`
 
-`multipart/form-data`，字段 `file`（文件）、`assetType`（`model`）、`lastModified`（可选，默认 `0`）。
+`multipart/form-data`，字段 `file`（文件）、`assetType`（`model`）、`lastModified`（可选，默认 `0`），以及 `title`、`thumbnail`（可选 PNG 文件，最大 512 KiB）。
 
 ```json
 {
@@ -179,7 +184,7 @@ JSON 接口都用下面的包装，`code` 为 `0` 表示成功。HTTP 状态码�
 }
 ```
 
-**去重：** `assetType` 和 `sha256` 都相同时不新建，返回已有资源和 `"isNew": false`（HTTP 200）；新建时 HTTP 201。必须去重：内置模型每次拖进场景都会上传一次。
+**去重：** `assetType` 和 `sha256` 都相同时不新建，返回已有资源和 `"isNew": false`（HTTP 200）；新建时 HTTP 201。重复上传保留已有条目的标题和 ID，仅在缺图时补图；拖入场景只引用该 ID。
 
 **校验：** 文件头是 `glTF`，版本为 2，头部声明的长度等于文件长度。不通过返回 422。
 
@@ -188,6 +193,10 @@ JSON 接口都用下面的包装，`code` 为 `0` 表示成功。HTTP 状态码�
 - `GET /assets`：返回资源数组，按 `createdAt` 降序。
 - `GET /assets/{assetId}`：返回资源信息。
 - `GET /assets/{assetId}/content`：返回文件内容，带 `Content-Type`、`Content-Length`，并且建议 `Cache-Control: private, max-age=31536000, immutable`（同一个 `assetId` 的内容永远不变）。打开场景时会同时请求所有用到的模型，要支持并发。数据大屏和后端不同域时，这个接口要配 CORS。
+
+- `PATCH /assets/{assetId}`：请求 `{ "title": "储能柜" }`，返回更新后的资源信息。标题和模型文件名独立。
+- `GET /assets/{assetId}/thumbnail`：返回图片及相应 MIME 类型。上传模型时前端用 Three.js 离屏生成 PNG，随模型一次提交；无 WebGL 时仍可上传模型。初始模型沿用随仓库提供的 WebP。
+- `PUT /assets/{assetId}/thumbnail`：旧模型首次展示时可上传缺失的 PNG 缩略图。只补空缺，返回完整的资源信息；删除模型时同时清理缩略图。
 
 ### 5.3 查询引用和删除
 

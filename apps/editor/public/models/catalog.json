@@ -1,0 +1,74 @@
+[
+  {
+    "file": "ess-cabinet-basic.glb",
+    "title": "储能柜"
+  },
+  {
+    "file": "utility-cabinet.glb",
+    "title": "配电柜"
+  },
+  {
+    "file": "breaker-panel.glb",
+    "title": "配电箱"
+  },
+  {
+    "file": "street-lamp.glb",
+    "title": "路灯"
+  },
+  {
+    "file": "oil-drum.glb",
+    "title": "油桶"
+  },
+  {
+    "file": "fire-extinguisher.glb",
+    "title": "灭火器"
+  },
+  {
+    "file": "energy-storage-container.glb",
+    "title": "储能集装箱",
+    "scale": 7.4
+  },
+  {
+    "file": "solar-array.glb",
+    "title": "光伏阵列",
+    "scale": 5.0
+  },
+  {
+    "file": "wind-turbine.glb",
+    "title": "风力发电机",
+    "scale": 20.0
+  },
+  {
+    "file": "thermal-storage-tank.glb",
+    "title": "储热罐",
+    "scale": 8.0
+  },
+  {
+    "file": "energy-center.glb",
+    "title": "能源中心",
+    "scale": 15.0
+  },
+  {
+    "file": "office-tower.glb",
+    "title": "办公楼",
+    "scale": 14.0
+  },
+  {
+    "file": "factory.glb",
+    "title": "制造车间",
+    "scale": 16.0
+  },
+  {
+    "file": "warehouse.glb",
+    "title": "仓库",
+    "scale": 18.0
+  },
+  {
+    "file": "tree-broadleaf-a.glb",
+    "title": "树"
+  },
+  {
+    "file": "bush.glb",
+    "title": "灌木"
+  }
+]

@@ -1,7 +1,7 @@
 /** 从资源栏拖进视口时带的数据。 */
 export const ASSET_DRAG_MIME = 'application/x-twin-studio-asset'
 
-export type AssetDragPayload = { type: 'asset'; assetId: string; name: string } | { type: 'builtin'; modelKey: string }
+export type AssetDragPayload = { type: 'asset'; assetId: string; name: string; scale: number }
 
 export function writeAssetDrag(dataTransfer: DataTransfer, payload: AssetDragPayload): void {
   dataTransfer.effectAllowed = 'copy'

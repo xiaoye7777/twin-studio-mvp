@@ -22,7 +22,15 @@ export interface ProjectInfo {
   updatedAt: string
 }
 
+export interface ModelPresentation {
+  title: string
+  thumbnail?: Blob | null
+}
+
 export interface AssetInfo {
+  title?: string
+  thumbnailUrl?: string | null
+  scale?: number
   id: string
   name: string
   assetType: AssetType
@@ -69,6 +77,7 @@ export interface ApiAdapter {
   scenePath(projectId: string): string
   assetsPath(): string
   assetPath(assetId: string): string
+  assetThumbnailPath(assetId: string): string
   assetContentPath(assetId: string): string
 
   /** 把后端的返回拆成统一的结构。 */
@@ -82,7 +91,8 @@ export interface ApiAdapter {
   createProjectBody(input: { name: string; description: string }): unknown
   updateProjectBody(input: { name: string; description: string }): unknown
   saveSceneBody(input: { baseRevision: number; saveId: string; document: SceneDocument }): unknown
-  uploadAssetForm(file: File, assetType: AssetType): FormData
+  renameAssetBody(title: string): unknown
+  uploadAssetForm(file: File, assetType: AssetType, presentation?: ModelPresentation): FormData
 
   // 响应：把后端的数据翻译成前端要的结构
   toProject(raw: unknown): ProjectInfo
@@ -94,7 +104,7 @@ export interface ApiAdapter {
   toAsset(raw: unknown): AssetInfo
   toAssets(raw: unknown): AssetInfo[]
   /** 上传的返回。 */
-  toUploadedAsset(raw: unknown): AssetInfo
+  toUploadedAsset(raw: unknown): { isNew: boolean; asset: AssetInfo }
 }
 
 /** 后端没返回描述时当作空。 */
@@ -115,6 +125,7 @@ export const defaultAdapter: ApiAdapter = {
   scenePath: projectId => `/projects/${encodeURIComponent(projectId)}/scene`,
   assetsPath: () => '/assets',
   assetPath: assetId => `/assets/${encodeURIComponent(assetId)}`,
+  assetThumbnailPath: assetId => `/assets/${encodeURIComponent(assetId)}/thumbnail`,
   assetContentPath: assetId => `/assets/${encodeURIComponent(assetId)}/content`,
 
   unwrap(status, body) {
@@ -128,11 +139,16 @@ export const defaultAdapter: ApiAdapter = {
   createProjectBody: input => input,
   updateProjectBody: input => input,
   saveSceneBody: input => input,
-  uploadAssetForm(file, assetType) {
+  renameAssetBody: title => ({ title }),
+  uploadAssetForm(file, assetType, presentation) {
     const form = new FormData()
     form.append('file', file)
     form.append('assetType', assetType)
     form.append('lastModified', String(file.lastModified))
+    if (presentation) {
+      form.append('title', presentation.title)
+      if (presentation.thumbnail) form.append('thumbnail', presentation.thumbnail, 'thumbnail.png')
+    }
     return form
   },
 
@@ -151,7 +167,7 @@ export const defaultAdapter: ApiAdapter = {
   },
   toAsset: raw => raw as AssetInfo,
   toAssets: raw => raw as AssetInfo[],
-  toUploadedAsset: raw => (raw as { asset: AssetInfo }).asset,
+  toUploadedAsset: raw => raw as { isNew: boolean; asset: AssetInfo },
 }
 
 // 公司分支上的 adapter.local.ts 存在时用它；import.meta.glob 找不到文件时返回空对象，不会报错。
