@@ -93,8 +93,10 @@ function drag(event: DragEvent): void {
 }
 .thumb {
   display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
   aspect-ratio: 16/9;
+  overflow: hidden;
   min-height: 0;
   background: var(--s-panel-2);
   color: var(--s-fg-3);
