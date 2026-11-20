@@ -71,7 +71,7 @@ function drag(event: DragEvent): void {
         <strong :title="model.title">{{ model.title }}</strong
         ><small>{{ size }}</small>
       </div>
-      <UiDropdown :sections="menu" align="end" :width="138"
+      <UiDropdown v-if="!compact" :sections="menu" align="end" :width="138"
         ><template #default="{ toggle }">
           <button class="s-icon-btn" :aria-label="`${model.title}的更多操作`" title="更多" @click="toggle">
             <MoreHorizontal :size="14" />
@@ -133,20 +133,30 @@ function drag(event: DragEvent): void {
   font-size: 11px;
 }
 .compact {
-  width: 105px;
+  width: 140px;
   flex: none;
   cursor: grab;
 }
 .compact .body {
-  padding: 3px 3px 4px 6px;
+  padding: 4px 6px;
 }
 .compact .thumb {
   flex: 1;
+}
+.compact .caption {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
 }
 .compact .caption strong {
   font-size: 11px;
 }
 .compact .caption small {
+  flex: none;
+  margin-top: 0;
+  white-space: nowrap;
   font-size: 10px;
 }
 </style>

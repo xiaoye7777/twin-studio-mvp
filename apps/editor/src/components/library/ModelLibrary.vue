@@ -10,7 +10,7 @@ import { useAssetStore } from '@/stores/assets'
 import ModelCard from './ModelCard.vue'
 import ModelUploadDialog from './ModelUploadDialog.vue'
 
-const props = defineProps<{ compact?: boolean; inScene?: (id: string) => boolean }>()
+defineProps<{ compact?: boolean }>()
 const store = useAssetStore()
 const uploading = ref(false)
 const loading = ref(true)
@@ -45,9 +45,7 @@ async function rename(model: LibraryModel): Promise<void> {
 }
 
 async function remove(model: LibraryModel): Promise<void> {
-  const note = props.inScene?.(model.id) ? '当前场景正在使用这个模型，删除后下次打开将无法加载它。' : ''
-  if (!(await confirmAction(`删除「${model.title}」？${note}`, { title: '删除模型', confirm: '删除', danger: true })))
-    return
+  if (!(await confirmAction(`删除「${model.title}」？`, { title: '删除模型', confirm: '删除', danger: true }))) return
   try {
     try {
       await store.remove(model.id)
