@@ -7,12 +7,17 @@
  */
 import type { AssetType, SceneDocument } from '@twin-studio/core'
 
+export type CoverSelection = { bookmarkId: string } | { source: 'upload' }
+
 export interface ProjectInfo {
   id: string
   name: string
   /** 描述；没填是空字符串。 */
   description: string
   coverUrl: string | null
+  coverSource?: 'auto' | 'bookmark' | 'upload'
+  /** 最近一次封面来自镜头时记录它的 ID。 */
+  coverBookmarkId?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -60,7 +65,7 @@ export interface ApiAdapter {
   // 路径
   projectsPath(): string
   projectPath(projectId: string): string
-  coverPath(projectId: string): string
+  coverPath(projectId: string, selection?: CoverSelection): string
   scenePath(projectId: string): string
   assetsPath(): string
   assetPath(assetId: string): string
@@ -82,6 +87,7 @@ export interface ApiAdapter {
   // 响应：把后端的数据翻译成前端要的结构
   toProject(raw: unknown): ProjectInfo
   toProjects(raw: unknown): ProjectInfo[]
+  toCoverUrl(raw: unknown): string
   toSceneRead(raw: unknown): SceneRead
   toSceneSaved(raw: unknown): SceneSaved
   toSceneConflict(raw: unknown): SceneConflict
@@ -102,7 +108,10 @@ export const defaultAdapter: ApiAdapter = {
 
   projectsPath: () => '/projects',
   projectPath: projectId => `/projects/${encodeURIComponent(projectId)}`,
-  coverPath: projectId => `/projects/${encodeURIComponent(projectId)}/cover`,
+  coverPath: (projectId, selection) => {
+    const path = `/projects/${encodeURIComponent(projectId)}/cover`
+    return selection ? `${path}?${new URLSearchParams(selection)}` : path
+  },
   scenePath: projectId => `/projects/${encodeURIComponent(projectId)}/scene`,
   assetsPath: () => '/assets',
   assetPath: assetId => `/assets/${encodeURIComponent(assetId)}`,
@@ -129,6 +138,7 @@ export const defaultAdapter: ApiAdapter = {
 
   toProject: toProjectInfo,
   toProjects: raw => (raw as unknown[]).map(toProjectInfo),
+  toCoverUrl: raw => (raw as { coverUrl: string }).coverUrl,
   toSceneRead: raw => raw as SceneRead,
   toSceneSaved: raw => raw as SceneSaved,
   toSceneConflict(raw) {

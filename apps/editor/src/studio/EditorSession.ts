@@ -50,8 +50,9 @@ export interface EditorSessionDeps {
   projectName: string
   assets: AssetRepository
   scenes: EditorSceneRepository
-  /** 每次保存后把场景的小图交出去，用作场景卡片的封面。 */
-  onCover?: (cover: Blob) => void
+  coverBookmarkId: string | null
+  hasUploadedCover: boolean
+  uploadCover: (cover: Blob, bookmarkId?: string) => Promise<string>
 }
 
 /**
@@ -74,6 +75,8 @@ export class EditorSession {
   readonly twin = reactive(createTwinState())
   readonly ui = reactive({
     ready: false,
+    coverBookmarkId: null as string | null,
+    settingCover: false,
     error: '',
     warnings: [] as string[],
     mode: 'edit' as 'edit' | 'preview',
@@ -118,6 +121,7 @@ export class EditorSession {
     readonly canvas: HTMLCanvasElement,
     private readonly deps: EditorSessionDeps,
   ) {
+    this.ui.coverBookmarkId = deps.coverBookmarkId
     this.projectId = deps.projectId
     this.assets = deps.assets
     this.scenes = deps.scenes
@@ -307,10 +311,31 @@ export class EditorSession {
     if (this.store.document === saved) this.store.markSaved()
     this.ui.saveState = this.store.isDirty ? 'unsaved' : 'saved'
     this.ui.saveError = ''
-    void this.captureBlob(480).then(cover => cover && !this.disposed && this.deps.onCover?.(cover))
+    if (!this.ui.coverBookmarkId && !this.deps.hasUploadedCover) {
+      void this.captureBlob(480)
+        .then(cover => {
+          if (cover && !this.disposed && !this.ui.coverBookmarkId) return this.deps.uploadCover(cover)
+        })
+        .catch(() => {}) // 自动封面失败不影响已保存的场景。
+    }
   }
 
   // ================================================================ 截图
+
+  async setBookmarkCover(id: string): Promise<void> {
+    const bookmark = this.doc.value.bookmarks.find(item => item.id === id)
+    if (!bookmark) throw new Error('镜头不存在')
+    if (this.ui.settingCover) throw new Error('正在更新封面')
+    this.ui.settingCover = true
+    try {
+      const cover = await this.withCleanFrame(() => this.engine.renderView(bookmark.view, 640))
+      if (!cover || this.disposed) throw new Error('镜头截图失败，请重试')
+      await this.deps.uploadCover(cover, id)
+      this.ui.coverBookmarkId = id
+    } finally {
+      this.ui.settingCover = false
+    }
+  }
 
   /** 从指定视角截一张不含辅助线的图，不移动用户的相机。 */
   captureFrom(view: CameraView, width: number): Promise<string | null> {

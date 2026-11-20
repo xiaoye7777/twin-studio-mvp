@@ -11,7 +11,7 @@ import {
   type SceneDocument,
   type SceneRepository,
 } from '@twin-studio/core'
-import { adapter, type AssetInfo, type ProjectInfo, type SceneConflict } from './adapter'
+import { adapter, type AssetInfo, type CoverSelection, type ProjectInfo, type SceneConflict } from './adapter'
 import { ApiError, download, request } from './http'
 
 // ---------------------------------------------------------------- 项目
@@ -37,8 +37,13 @@ export const projectApi = {
     await request(adapter.projectPath(id), { method: 'DELETE' })
   },
   /** 上传封面图；不改变项目的修改时间。 */
-  async setCover(id: string, cover: Blob): Promise<void> {
-    await request(adapter.coverPath(id), { method: 'PUT', headers: { 'Content-Type': cover.type }, body: cover })
+  async setCover(id: string, cover: Blob, selection?: CoverSelection): Promise<string> {
+    const result = await request(adapter.coverPath(id, selection), {
+      method: 'PUT',
+      headers: { 'Content-Type': cover.type },
+      body: cover,
+    })
+    return adapter.toCoverUrl(result)
   },
 }
 

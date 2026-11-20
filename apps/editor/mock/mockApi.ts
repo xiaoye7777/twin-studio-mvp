@@ -18,6 +18,8 @@ interface Project {
   name: string
   description: string
   coverUrl: string | null
+  coverSource?: 'auto' | 'bookmark' | 'upload'
+  coverBookmarkId?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -96,13 +98,15 @@ function usagesOf(assetId: string): Array<{ id: string; name: string }> {
   })
 }
 
-async function handleProjects(request: IncomingMessage, parts: string[]): Promise<Reply> {
+async function handleProjects(request: IncomingMessage, parts: string[], query: URLSearchParams): Promise<Reply> {
   const [id, section] = parts
+  // 收完请求体再读取项目状态，后续校验、写入之间不等待，避免并发保存回写旧封面。
+  const raw = ['POST', 'PUT', 'PATCH'].includes(request.method ?? '') ? await readBody(request) : Buffer.alloc(0)
   const projects = readProjects()
   if (!id) {
     if (request.method === 'GET') return ok(projects)
     if (request.method === 'POST') {
-      const { name, description } = JSON.parse((await readBody(request)).toString()) as {
+      const { name, description } = JSON.parse(raw.toString()) as {
         name?: string
         description?: string
       }
@@ -122,18 +126,30 @@ async function handleProjects(request: IncomingMessage, parts: string[]): Promis
   }
   const project = projects.find(item => item.id === id)
   if (!project) return fail(404, 40400, '项目不存在')
-  if (section === 'scene') return handleScene(request, project, projects)
+  if (section === 'scene') return handleScene(request, project, projects, raw)
   if (section === 'cover') {
     if (request.method !== 'PUT') return fail(405, 40000, '不支持的请求方法')
-    writeFileSync(coverFile(project.id), await readBody(request))
+    const bookmarkId = query.get('bookmarkId')
+    if (bookmarkId === '') return fail(400, 40000, '镜头 ID 不能为空')
+    const uploaded = query.get('source') === 'upload'
+    if (bookmarkId && uploaded) return fail(400, 40000, '请选择一种封面来源')
+    const source = uploaded ? 'upload' : bookmarkId ? 'bookmark' : 'auto'
+    if (source === 'auto' && (project.coverBookmarkId || project.coverSource === 'upload'))
+      return ok({ coverUrl: project.coverUrl })
+    if (raw.length > 1024 ** 2) return fail(413, 41300, '封面超过 1 MiB 限制')
+    if (request.headers['content-type'] !== 'image/jpeg' || raw[0] !== 0xff || raw[1] !== 0xd8)
+      return fail(400, 40000, '封面必须是 JPEG 图片')
+    writeFileSync(coverFile(project.id), raw)
+    project.coverSource = source
+    project.coverBookmarkId = bookmarkId
     // 封面变化不算修改项目，updatedAt 不动。
-    project.coverUrl = `/api/v1/projects/${project.id}/cover?v=${Date.now()}`
+    project.coverUrl = `/api/v1/projects/${project.id}/cover?v=${randomUUID()}`
     writeProjects(projects)
     return ok({ coverUrl: project.coverUrl })
   }
   if (request.method === 'GET') return ok(project)
   if (request.method === 'PATCH') {
-    const { name, description } = JSON.parse((await readBody(request)).toString()) as {
+    const { name, description } = JSON.parse(raw.toString()) as {
       name?: string
       description?: string
     }
@@ -153,7 +169,7 @@ async function handleProjects(request: IncomingMessage, parts: string[]): Promis
   return fail(405, 40000, '不支持的请求方法')
 }
 
-async function handleScene(request: IncomingMessage, project: Project, projects: Project[]): Promise<Reply> {
+function handleScene(request: IncomingMessage, project: Project, projects: Project[], raw: Buffer): Reply {
   const path = sceneFile(project.id)
   const current = readJson<SceneRecord | null>(path, null)
   if (request.method === 'GET') {
@@ -164,7 +180,6 @@ async function handleScene(request: IncomingMessage, project: Project, projects:
     })
   }
   if (request.method !== 'PUT') return fail(405, 40000, '不支持的请求方法')
-  const raw = await readBody(request)
   if (raw.length > 8 * 1024 ** 2) return fail(413, 41300, '场景超过 8 MiB 限制')
   const { baseRevision, saveId, document } = JSON.parse(raw.toString()) as {
     baseRevision: number
@@ -276,7 +291,8 @@ export function mockApi(): Plugin {
               response.setHeader('Content-Type', 'image/jpeg')
               return response.end(readFileSync(path))
             }
-            if (resource === 'projects') return sendJson(response, await handleProjects(request, parts))
+            if (resource === 'projects')
+              return sendJson(response, await handleProjects(request, parts, url.searchParams))
             if (resource === 'assets') {
               const reply = await handleAssets(request, parts, url.searchParams)
               if (!Buffer.isBuffer(reply)) return sendJson(response, reply)

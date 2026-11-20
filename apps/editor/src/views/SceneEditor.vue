@@ -52,7 +52,9 @@ onMounted(async () => {
     projectName: project.value.name,
     assets: assetRepository,
     scenes: new HttpSceneRepository(),
-    onCover: cover => void projectApi.setCover(projectId, cover).catch(() => {}),
+    coverBookmarkId: project.value.coverBookmarkId ?? null,
+    hasUploadedCover: project.value.coverSource === 'upload',
+    uploadCover: (cover, bookmarkId) => projectApi.setCover(projectId, cover, bookmarkId ? { bookmarkId } : undefined),
   })
   session.value = opened
   if (import.meta.env.DEV) (window as unknown as { __studio?: EditorSession }).__studio = opened

@@ -61,6 +61,8 @@ JSON 接口都用下面的包装，`code` 为 `0` 表示成功。HTTP 状态码�
 | `name` | string | 标题，2～40 个字符 |
 | `description` | string | 描述，最多 200 个字符，可以为空 |
 | `coverUrl` | string \| null | 封面地址，没有时为 `null` |
+| `coverSource` | string | `auto`（默认）、`bookmark`（镜头）或 `upload`（上传图片）。旧记录有镜头 ID 时按镜头封面处理 |
+| `coverBookmarkId` | string \| null | 镜头封面的来源 ID，上传图片时清空 |
 | `createdAt` | string | 创建时间 |
 | `updatedAt` | string | 保存场景和改信息时更新，上传封面时**不**更新 |
 
@@ -68,7 +70,7 @@ JSON 接口都用下面的包装，`code` 为 `0` 表示成功。HTTP 状态码�
 - `POST /projects`：请求 `{ "name": "新场景", "description": "这个场景是做什么的" }`，返回场景信息。后端不用创建默认场景。
 - `PATCH /projects/{projectId}`：请求 `{ "name": "新标题", "description": "新描述" }`，只改传了的字段，返回场景信息。
 - `DELETE /projects/{projectId}`：删除场景数据和封面，**不删除模型文件**，模型可能被别的场景使用。
-- `PUT /projects/{projectId}/cover`：请求体是图片本身（`Content-Type: image/jpeg`），返回 `{ "coverUrl": "..." }`。前端每次保存后上传一次。
+- `PUT /projects/{projectId}/cover`：请求体是图片本身（`Content-Type: image/jpeg`），返回 `{ "coverUrl": "..." }`。手动设置时传查询参数 `bookmarkId`，后端保存图片及镜头 ID，并返回新的封面 URL 以刷新缓存。从卡片上传时传 `?source=upload`，将来源改为 `upload` 并清空镜头 ID。不带参数的是保存场景产生的自动截图；如果已有镜头封面或上传的封面，保留原图并返回当前 URL。场景保存、改名、删除镜头都应保留已设置的封面。
 
 ## 4. 场景
 

@@ -32,10 +32,16 @@ export const useProjectStore = defineStore('project', () => {
     projects.value = projects.value.map(project => (project.id === id ? updated : project))
   }
 
+  async function replaceCover(id: string, image: Blob): Promise<void> {
+    const coverUrl = await projectApi.setCover(id, image, { source: 'upload' })
+    const project = projects.value.find(item => item.id === id)
+    if (project) Object.assign(project, { coverUrl, coverSource: 'upload', coverBookmarkId: null })
+  }
+
   async function remove(id: string): Promise<void> {
     await projectApi.remove(id)
     projects.value = projects.value.filter(project => project.id !== id)
   }
 
-  return { projects, loading, error, refresh, create, update, remove }
+  return { projects, loading, error, refresh, create, update, replaceCover, remove }
 })

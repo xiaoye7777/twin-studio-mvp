@@ -6,6 +6,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { ProjectInfo } from '@/api/adapter'
 import ProjectCard from '@/components/project/ProjectCard.vue'
+import CoverDialog from '@/components/project/CoverDialog.vue'
 import ProjectDialog from '@/components/project/ProjectDialog.vue'
 import { confirmAction } from '@/components/ui/confirm'
 import { useProjectStore } from '@/stores/project'
@@ -21,6 +22,7 @@ const dialogOpen = computed({
   },
 })
 const submitting = ref(false)
+const coverProject = ref<ProjectInfo | null>(null)
 
 onMounted(() => void store.refresh())
 
@@ -76,6 +78,7 @@ async function remove(project: ProjectInfo): Promise<void> {
         :key="project.id"
         :project="project"
         @edit="open"
+        @cover="coverProject = $event"
         @rename="dialog = { project: $event }"
         @remove="remove"
       />
@@ -85,6 +88,7 @@ async function remove(project: ProjectInfo): Promise<void> {
       <p>还没有场景</p>
     </div>
 
+    <CoverDialog v-if="coverProject" :project="coverProject" @close="coverProject = null" />
     <ProjectDialog
       v-model="dialogOpen"
       :title="dialog?.project ? '编辑场景信息' : '新建场景'"

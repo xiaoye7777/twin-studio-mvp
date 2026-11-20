@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Box, MoreHorizontal, PenLine, Trash2, Type } from 'lucide-vue-next'
+import { Box, Image as ImageIcon, MoreHorizontal, PenLine, Trash2, Type } from 'lucide-vue-next'
 import { computed } from 'vue'
 import type { ProjectInfo } from '@/api/adapter'
 import type { MenuSections } from '@/components/ui/menu'
@@ -8,6 +8,7 @@ import UiDropdown from '@/components/ui/UiDropdown.vue'
 const props = defineProps<{ project: ProjectInfo }>()
 const emit = defineEmits<{
   edit: [project: ProjectInfo]
+  cover: [project: ProjectInfo]
   rename: [project: ProjectInfo]
   remove: [project: ProjectInfo]
 }>()
@@ -20,7 +21,10 @@ const updated = computed(() =>
   }),
 )
 const menu = computed<MenuSections>(() => [
-  [{ label: '编辑信息', icon: Type, action: () => emit('rename', props.project) }],
+  [
+    { label: '编辑信息', icon: Type, action: () => emit('rename', props.project) },
+    { label: '更改封面', icon: ImageIcon, action: () => emit('cover', props.project) },
+  ],
   [{ label: '删除场景', icon: Trash2, danger: true, action: () => emit('remove', props.project) }],
 ])
 </script>
