@@ -10,6 +10,7 @@ export * from './contract/viewerContract'
 
 export * from './infrastructure/assets/AssetRepository'
 export * from './infrastructure/assets/UrlAssetRepository'
+export * from './infrastructure/assets/sceneAssetDownloads'
 export * from './infrastructure/scenes/SceneRepository'
 export * from './infrastructure/data'
 

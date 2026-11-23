@@ -1,12 +1,14 @@
 <script setup lang="ts">
 /*
- * Viewer SDK 的组件：加载一份场景 JSON（文件按资源 ID 向宿主要），显示场景，
+ * Viewer SDK 的组件：加载一份场景 JSON（自动批量解析资源下载地址），显示场景，
  * 点击对象时聚焦并把对象的数据告诉宿主。场景里的信息面板默认一起显示。
  */
 import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import {
   type AssetResolver,
   loadSceneDocument,
+  prepareSceneAssets,
+  type ViewerAssetApi,
   type SceneDocument,
   type TwinBindingTarget,
   TwinSceneRuntime,
@@ -23,7 +25,8 @@ const props = withDefaults(
     /** 场景 JSON：解析好的对象，或一个返回 JSON 的地址。 */
     scene: object | string
     /** 资源 ID → 文件地址（也可以直接给 Blob）。 */
-    resolveAsset: AssetResolver
+    resolveAsset?: AssetResolver
+    assetApi?: ViewerAssetApi
     /** 画质；auto 按设备和屏幕自适应。 */
     quality?: ViewerQuality
     focusOnClick?: ViewerClickFocus
@@ -32,7 +35,14 @@ const props = withDefaults(
     /** HTTP 接口的认证请求头：Token 不进场景 JSON，由集成方提供。 */
     dataRequestHeaders?: TwinSceneRuntimeOptions['dataRequestHeaders']
   }>(),
-  { quality: 'auto', focusOnClick: true, panels: true, dataRequestHeaders: undefined },
+  {
+    quality: 'auto',
+    focusOnClick: true,
+    panels: true,
+    dataRequestHeaders: undefined,
+    resolveAsset: undefined,
+    assetApi: undefined,
+  },
 )
 const emit = defineEmits<TwinSceneViewerEvents>()
 const canvas = ref<HTMLCanvasElement>()
@@ -82,8 +92,10 @@ async function load(): Promise<void> {
   try {
     const { document, dropped } = await readScene(signal)
     if (!mounted || request !== generation) return
-    const hdrAssetId = document.settings.sky.hdrAssetId
-    const assets = new UrlAssetRepository(id => props.resolveAsset(id), {
+    const resolve = props.resolveAsset ?? (await prepareSceneAssets(document, props.assetApi, signal))
+    if (!mounted || request !== generation) return
+    const hdrAssetId = document.settings.sky.mode === 'hdr' ? document.settings.sky.hdrAssetId : null
+    const assets = new UrlAssetRepository(resolve, {
       signal,
       typeOf: id => (id === hdrAssetId ? 'environment' : 'model'),
     })

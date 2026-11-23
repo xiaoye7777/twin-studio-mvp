@@ -1,4 +1,4 @@
-# @twin-studio/viewer 0.10.0
+# @twin-studio/viewer 0.11.0
 
 Vue 3 项目运行组件。支持 Node 20.16+ 和 pnpm 10.20.0；加载编辑器保存的场景 JSON，按资源 ID 取模型文件，恢复模型、设备绑定、实时数据、镜头和信息面板。
 
@@ -8,9 +8,9 @@ import { ref } from 'vue'
 import { TwinSceneViewer, type TwinSceneViewerPublicApi, type ViewerTargetClick } from '@twin-studio/viewer'
 import '@twin-studio/viewer/style.css'
 
+// 父页面传入保存的场景文档即可。
+defineProps<{ scene: object }>()
 const viewer = ref<TwinSceneViewerPublicApi | null>(null)
-// 场景 JSON 从后端取：GET /projects/{projectId}/scene 返回的 document
-const scene = ref<object | null>(null)
 
 function onClick(event: ViewerTargetClick) {
   console.log(event.data.name, event.data.device, event.data.values)
@@ -21,18 +21,38 @@ function onClick(event: ViewerTargetClick) {
     v-if="scene"
     ref="viewer"
     :scene="scene"
-    :resolve-asset="id => `/api/v1/assets/${id}/content`"
     @target-click="onClick"
   />
 </template>
 ```
+
+## 从对象存储批量加载模型
+
+大屏只需写 `<TwinSceneViewer :scene="sceneDocument" />`。Viewer 读场景，收集模型和启用的 HDR 环境贴图，去重后批量查询资源对应的文件 ID，再批量换取下载地址，从对象存储加载文件。10 个柜子共用同一个模型时，只查询和下载这份模型一次。空场景跳过两项查询。
+
+SDK 默认使用 MVP 的同源模拟接口。正式环境如使用同样的响应格式，只需在项目接入时配置业务接口地址及所需请求头，例如：
+
+```vue
+<TwinSceneViewer :scene="sceneDocument" :asset-api="assetApi" />
+```
+
+```ts
+const assetApi = {
+  assetsUrl: '/api/v1/assets/by-ids',
+  fileUrlsUrl: '/api/v1/files/download-urls',
+  headers: { Authorization: `Bearer ${token}`, 'tenant-id': tenantId },
+}
+```
+
+两项业务查询都使用 GET，参数为重复的 `ids`。若资产记录已含 `downloadUrl`，Viewer 直接使用。业务请求头仅用于查询接口。旧大屏传入的 `resolve-asset` 仍优先生效，可用于既有文件服务或本地 Blob。[批量下载接口与响应示例](../../API.md#正式环境的模型下载)
 
 ## 属性
 
 | 属性 | 默认 | 说明 |
 | --- | --- | --- |
 | `scene` | 必填 | 场景 JSON：解析好的对象，或一个返回 JSON 的地址。换一份就重新加载 |
-| `resolve-asset` | 必填 | 资源 ID → 模型文件。返回地址（SDK 自己下载），或 `Blob`（需要带登录信息时宿主下载好再给），可以是异步函数 |
+| `asset-api` | MVP 同源接口 | 自动加载时的业务接口地址和请求头，类型为 `ViewerAssetApi` |
+| `resolve-asset` | 可选 | 资源 ID → 模型文件。返回地址（SDK 自己下载），或 `Blob`（需要带登录信息时宿主下载好再给），可以是异步函数 |
 | `focus-on-click` | `true` | 宿主控制点击聚焦。可传布尔值，或传入函数，按点击的设备 / 场景实例返回布尔值 |
 | `quality` | `auto` | 画质：`auto`、`low`、`medium`、`high` |
 | `panels` | `true` | 显示场景里的信息面板；宿主有自己的界面时设为 `false` |
@@ -105,7 +125,6 @@ async function openBox(id: string) {
 <template>
   <section style="height: 65vh">
     <TwinSceneViewer ref="viewer" :scene="scene"
-      :resolve-asset="id => `/api/v1/assets/${encodeURIComponent(id)}/content`"
       :focus-on-click="clickFocus"
       @loaded="state = viewer?.getRuntimeState() ?? null"
       @selection-change="selection = $event" />
@@ -144,7 +163,7 @@ const cameras = ref<ViewerBookmark[]>([])
 </script>
 <template>
   <section style="height: 65vh">
-    <TwinSceneViewer ref="viewer" :scene="scene" :resolve-asset="id => `/api/v1/assets/${encodeURIComponent(id)}/content`"
+    <TwinSceneViewer ref="viewer" :scene="scene"
       @loaded="cameras = $event.bookmarks" @error="cameras = []" />
   </section>
   <button v-for="camera in cameras" :key="camera.id" @click="viewer?.flyToBookmark(camera.id)">

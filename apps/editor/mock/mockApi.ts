@@ -364,6 +364,15 @@ export function mockApi(): Plugin {
   return {
     name: 'twin-studio-mock-api',
     configureServer(server) {
+      // 本地模拟对象存储。该地址只返回模型文件，生产环境使用存储服务签发的 URL。
+      server.middlewares.use('/mock-storage', (request, response, next) => {
+        if (request.method !== 'GET') return next()
+        const fileId = new URL(request.url ?? '/', 'http://mock').pathname.slice(1)
+        const asset = readAssets().find(item => item.sha256 === fileId)
+        if (!asset) return sendJson(response, fail(404, 40400, '文件不存在'))
+        response.setHeader('Content-Type', asset.mimeType)
+        response.end(readFileSync(contentFile(asset.id)))
+      })
       server.middlewares.use('/api/v1', (request, response) => {
         void (async () => {
           const url = new URL(request.url ?? '/', 'http://mock')
@@ -378,6 +387,24 @@ export function mockApi(): Plugin {
             }
             if (resource === 'projects')
               return sendJson(response, await handleProjects(request, parts, url.searchParams))
+            if (request.method === 'GET' && resource === 'assets' && parts[0] === 'by-ids') {
+              const ids = new Set(url.searchParams.getAll('ids'))
+              const rows = readAssets().filter(asset => ids.has(asset.id))
+              return sendJson(response, ok(rows.map(asset => ({ id: asset.id, fileId: asset.sha256 }))))
+            }
+            if (request.method === 'GET' && resource === 'files' && parts[0] === 'download-urls') {
+              const ids = new Set(url.searchParams.getAll('ids'))
+              const rows = readAssets().filter(asset => ids.delete(asset.sha256))
+              return sendJson(
+                response,
+                ok(
+                  rows.map(asset => ({
+                    fileId: asset.sha256,
+                    downloadUrl: `/mock-storage/${asset.sha256}`,
+                  })),
+                ),
+              )
+            }
             if (resource === 'assets') {
               const reply = await handleAssets(request, parts, url.searchParams)
               if (!Buffer.isBuffer(reply)) return sendJson(response, reply)

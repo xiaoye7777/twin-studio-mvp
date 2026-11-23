@@ -2,6 +2,11 @@ import type { DeepReadonly, DefineComponent } from 'vue'
 
 /** Asset id → where the file is: a URL to download, or the file itself when the host downloads it. */
 export type AssetResolver = (assetId: string) => string | Blob | Promise<string | Blob>
+export interface ViewerAssetApi {
+  assetsUrl?: string
+  fileUrlsUrl?: string
+  headers?: Record<string, string>
+}
 export type TwinBindingTarget =
   | { type: 'asset-instance'; instanceId: string }
   | { type: 'asset-node'; instanceId: string; assetNodeId: string }
@@ -259,7 +264,8 @@ export const TwinSceneViewer: DefineComponent<
     /** The scene JSON: a parsed object, or a URL that returns it. */
     scene: object | string
     /** The scene only holds asset ids; this says where each file is. */
-    resolveAsset: AssetResolver
+    resolveAsset?: AssetResolver
+    assetApi?: ViewerAssetApi
     focusOnClick?: ViewerClickFocus
     onSelectionChange?: (selection: ViewerSelection) => void
     onInteractionEvent?: (event: ViewerInteractionEvent) => void

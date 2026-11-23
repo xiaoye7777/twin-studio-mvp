@@ -111,9 +111,17 @@ if (!uploaded.ok) throw new Error(`文件上传失败（HTTP ${uploaded.status}�
 
 例如，先用 `model` 和 `model-thumbnail` 分别签发、上传、创建，取得上表两个文件 ID，再创建资源。后续场景保存 `node.model.assetId = asset.id`。文件 ID 标识字节，资源 ID 标识模型库条目；改标题、改封面和签名过期都不改变场景里的模型 ID。重复创建同内容模型时按第 5 节的去重规则返回已有条目。
 
-下载可保留业务后端的稳定读取路径（第 3、5 节），由后端响应文件或重定向到短期签名的 GET 地址。场景文档和资源记录持久化 ID 或对象键；每次读取可刷新临时地址。图像地址要支持浏览器直接加载，模型下载要支持编辑器的 fetch 和 Viewer 跨域读取。
+### 正式环境的模型下载
 
-前端接入位置为 `HttpAssetRepository.uploadFile/saveThumbnail` 和 `projectApi.setCover`。它们需要编排签发、直传、登记和业务绑定四步；路径或字段映射可放在 adapter 中。开发模拟服务也需补对应协议，或继续保留现有上传方式供本地开发。
+大屏交给 Viewer 一份场景文档。Viewer 自动收集并去重模型资源 ID 和已启用的 HDR 资源 ID，按以下顺序加载。这里给出 MVP 模拟服务及 SDK 默认约定，生产服务的路径可通过 `asset-api` 配置。
+
+| 调用方 | 请求示例 | 返回示例 |
+| --- | --- | --- |
+| Viewer → 业务后端 | `GET /api/v1/assets/by-ids?ids=asset_01&ids=asset_02` | `{"code":0,"msg":"ok","data":[{"id":"asset_01","fileId":143},{"id":"asset_02","fileId":201}]}` |
+| Viewer → 业务后端 | `GET /api/v1/files/download-urls?ids=143&ids=201` | `{"code":0,"msg":"ok","data":[{"fileId":201,"downloadUrl":"https://storage.example.com/pump.glb?signature=…"},{"fileId":143,"downloadUrl":"https://storage.example.com/cabinet.glb?signature=…"}]}` |
+| Viewer → 对象存储 | GET 返回的完整 `downloadUrl` | GLB 或 HDR 文件字节 |
+
+Viewer 按 ID 关联结果，响应数组可以乱序。多个资源引用同一文件时，文件 ID 只签发一次。若第一步直接返回 `{id, downloadUrl}`，该资源跳过文件签名查询。每次加载重新取地址，每批最多 64 个不同 ID；缺失的资源由 Viewer 现有的场景警告提示。业务接口可携带 `Authorization` 和 `tenant-id`，文件下载使用签名 URL。存储端需允许大屏来源跨域读取。开发模拟服务以 `/mock-storage/{fileId}` 提供本地文件，生产使用对象存储 URL。场景 JSON 只保存稳定的资源 ID。[Viewer 接入示例](packages/viewer/README.md#从对象存储批量加载模型)
 
 ## 3. 项目与卡片封面
 
