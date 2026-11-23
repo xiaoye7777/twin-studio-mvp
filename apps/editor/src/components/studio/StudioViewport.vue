@@ -106,7 +106,9 @@ function onDrop(event: DragEvent): void {
       </div>
 
       <div v-if="!editing" class="viewport__badge s-float">
-        <span class="s-dot" />预览模式 · 点击对象查看数据 · <span class="s-kbd">Esc</span> 退出
+        <span class="s-dot" />预览模式 ·
+        {{ ui.previewEventName ? `通知大屏：${ui.previewEventName}` : '点击对象查看数据' }} ·
+        <span class="s-kbd">Esc</span> 退出
       </div>
       <div v-if="placingGroup" class="viewport__hint s-float" data-testid="placing-hint">
         往「{{ placingGroup.name }}」添加面板：在场景里单击放置 · <span class="s-kbd">Esc</span> 或右键结束

@@ -3,6 +3,8 @@ export * from './domain/scene'
 export * from './domain/twin'
 export * from './domain/dataSources'
 export * from './domain/panels'
+export * from './domain/interactions'
+export * from './runtime/interactions/InteractionRuntime'
 
 export * from './contract/viewerContract'
 

@@ -11,7 +11,8 @@ import {
   type SceneNodeV2,
   type SceneTransform,
 } from '../domain/scene'
-import { targetNodeId } from '../domain/twin'
+import type { SceneInteraction } from '../domain/interactions'
+import { targetNodeId, type TwinBindingTarget } from '../domain/twin'
 
 type Doc = SceneDocumentV2
 type Node = SceneNodeV2
@@ -138,6 +139,12 @@ export function removeNodes(draft: Doc, ids: readonly string[]): Set<string> {
   for (const id of ids) for (const nodeId of subtreeIds(draft, id)) removed.add(nodeId)
   draft.nodes = draft.nodes.filter(node => !removed.has(node.id))
   draft.bindings = draft.bindings.filter(binding => !removed.has(targetNodeId(binding.target)))
+  if (draft.interactions)
+    draft.interactions = draft.interactions.filter(
+      rule =>
+        !removed.has(targetNodeId(rule.source)) &&
+        !(rule.action.target && removed.has(targetNodeId(rule.action.target))),
+    )
   for (const node of draft.nodes) {
     if (node.kind === 'panel' && node.panel.targetNodeId && removed.has(node.panel.targetNodeId))
       delete node.panel.targetNodeId
@@ -180,7 +187,29 @@ export function duplicateNodes(draft: Doc, ids: readonly string[], offset: [numb
     const target = copy?.kind === 'panel' ? copy.panel.targetNodeId : undefined
     if (copy?.kind === 'panel' && target && remap.has(target)) copy.panel.targetNodeId = remap.get(target)!
   }
+  if (draft.interactions?.length) draft.interactions.push(...copyInteractions(draft.interactions, remap))
   return created
+}
+
+/** 源对象随副本复制，指向同一批副本的目标也要重映射；外部目标保留原引用。 */
+export function copyInteractions(
+  rules: readonly SceneInteraction[],
+  remap: ReadonlyMap<string, string>,
+): SceneInteraction[] {
+  const remapTarget = (target: TwinBindingTarget): TwinBindingTarget => {
+    const id = remap.get(targetNodeId(target))
+    if (!id) return target
+    return 'instanceId' in target ? { ...target, instanceId: id } : { ...target, nodeId: id }
+  }
+  return rules
+    .filter(rule => remap.has(targetNodeId(rule.source)))
+    .map(original => {
+      const copy = plain(original)
+      copy.id = newId('interaction')
+      copy.source = remapTarget(copy.source)
+      if (copy.action.target) copy.action.target = remapTarget(copy.action.target)
+      return copy
+    })
 }
 
 export function uniqueName(doc: Doc, base: string): string {

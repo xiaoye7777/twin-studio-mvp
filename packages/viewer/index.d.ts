@@ -44,6 +44,8 @@ export type ViewerSelection = Readonly<{
 export type ViewerClickFocus = boolean | ((event: ViewerTargetClick) => boolean)
 
 export interface ViewerLoadedEvent {
+  /** 当前场景保存的镜头，按编辑器中的顺序。 */
+  bookmarks: ViewerBookmark[]
   projectId: string
   projectName: string
   objectCount: number
@@ -79,8 +81,35 @@ export type TwinSceneViewerEvents = {
   loaded: [info: ViewerLoadedEvent]
   error: [message: string]
   'selection-change': [selection: ViewerSelection]
+  'interaction-event': [event: ViewerInteractionEvent]
   'target-click': [event: ViewerTargetClick]
 }
+export type InteractionTrigger = 'click' | 'double-click' | 'hover-enter' | 'hover-leave'
+export type InteractionMetadataValue =
+  string | number | boolean | null | InteractionMetadataValue[] | { [key: string]: InteractionMetadataValue }
+export type InteractionMetadata = Record<string, InteractionMetadataValue>
+export type SceneInteraction = {
+  id: string
+  enabled: boolean
+  source: TwinBindingTarget
+  trigger: InteractionTrigger
+  action: { target?: TwinBindingTarget } & (
+    | { type: 'select' | 'clear-selection' | 'focus' | 'show' | 'hide' | 'toggle' | 'highlight' }
+    | { type: 'emit-event'; eventName: string; metadata?: InteractionMetadata }
+    | { type: 'fly-to-bookmark'; bookmarkId: string }
+  )
+}
+export interface ViewerInteractionEvent {
+  eventName: string
+  interactionId: string
+  trigger: InteractionTrigger
+  sourceTarget: Readonly<TwinBindingTarget>
+  triggerTarget: Readonly<TwinBindingTarget>
+  actionTarget: Readonly<TwinBindingTarget>
+  deviceId: string | null
+  metadata: Readonly<InteractionMetadata>
+}
+
 export interface ViewerBookmark {
   id: string
   name: string
@@ -222,6 +251,7 @@ export interface SceneDocumentV2 {
   cameraView?: CameraViewV2
   nodes: SceneNodeV2[]
   bindings: TwinBinding[]
+  interactions?: SceneInteraction[]
   bookmarks: CameraBookmark[]
 }
 export const TwinSceneViewer: DefineComponent<
@@ -232,6 +262,7 @@ export const TwinSceneViewer: DefineComponent<
     resolveAsset: AssetResolver
     focusOnClick?: ViewerClickFocus
     onSelectionChange?: (selection: ViewerSelection) => void
+    onInteractionEvent?: (event: ViewerInteractionEvent) => void
     onTargetClick?: (event: ViewerTargetClick) => void
     onLoaded?: (info: ViewerLoadedEvent) => void
     onError?: (message: string) => void

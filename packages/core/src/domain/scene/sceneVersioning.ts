@@ -68,6 +68,13 @@ function withoutUnsupported(raw: Record<string, unknown>, dropped: string[]): Re
       return false
     })
   }
+  if (Array.isArray(raw.interactions))
+    next.interactions = raw.interactions.filter(rule => {
+      const type = isRecord(rule) && isRecord(rule.action) ? rule.action.type : null
+      if (!['play-tour', 'stop-tour', 'play-animation', 'stop-animation'].includes(String(type))) return true
+      dropped.push(`不支持的交互响应：${type}`)
+      return false
+    })
   if (Array.isArray(raw.dataSources))
     next.dataSources = raw.dataSources.filter(source => !isRecord(source) || source.type !== 'mock')
   return next

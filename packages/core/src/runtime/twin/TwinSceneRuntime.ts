@@ -16,6 +16,7 @@ import type {
   TwinSceneViewerEvents,
   ViewerBookmark,
   ViewerClickHit,
+  ViewerInteractionEvent,
   ViewerObjectData,
   ViewerQuality,
   ViewerTargetClick,
@@ -31,9 +32,10 @@ import { bindingTargetFromObject, BindingTargetResolver } from './BindingTargetR
 import { createTwinState } from './createTwinState'
 import { readObjectData } from './readObjectData'
 import { TwinDataRuntime, type TwinDataRuntimeOptions } from './TwinDataRuntime'
-import { ViewerPointerEvents } from './ViewerPointerEvents'
+import { InteractionRuntime } from '../interactions/InteractionRuntime'
 
 export interface TwinSceneRuntimeOptions {
+  onInteractionEvent?: (event: ViewerInteractionEvent) => void
   quality?: ViewerQuality
   shouldFocusOnClick?: (event: ViewerTargetClick) => boolean
   onSelectionChange?: (selection: ViewerSelection) => void
@@ -56,7 +58,7 @@ export class TwinSceneRuntime {
   private readonly resolver: BindingTargetResolver
   private readonly data: TwinDataRuntime
   private readonly panels: PanelLayer
-  private pointers: ViewerPointerEvents | null = null
+  private interactions: InteractionRuntime | null = null
   private disposed = false
   private started = false
   private selection: ViewerSelection = null
@@ -89,12 +91,22 @@ export class TwinSceneRuntime {
       if (!document.cameraView) await this.engine.fitAll(0)
       this.data.initialize(document.projectId, document.bindings)
       this.data.start(document.dataSources)
-      this.pointers = new ViewerPointerEvents(
+      this.interactions = new InteractionRuntime(
         this.canvas,
         this.engine,
         () => this.roots,
         this.twin,
-        hit => this.handleClick(hit),
+        document.interactions ?? [],
+        {
+          resolver: this.resolver,
+          select: target => this.selectTarget(target),
+          clear: () => this.clearSelection(),
+          focus: target => this.focusTarget(target),
+          flyToBookmark: id => this.flyToBookmark(id),
+          deviceId: target => this.resolveBinding(target)?.device.id ?? null,
+          emit: event => this.options.onInteractionEvent?.(event),
+        },
+        (hit, autoFocus) => this.handleClick(hit, autoFocus),
         () => {
           this.clearSelection()
           this.options.onBlank?.()
@@ -111,7 +123,7 @@ export class TwinSceneRuntime {
   }
 
   /** 点击对象：高亮、相机聚焦，并把对象的数据交给宿主。 */
-  private handleClick(hit: ViewerClickHit): void {
+  private handleClick(hit: ViewerClickHit, autoFocus: boolean): void {
     if (this.disposed) return
     const binding = this.resolveBinding(hit.target, hit.bindingTarget)
     const data = this.objectData(hit.target, binding)
@@ -124,7 +136,7 @@ export class TwinSceneRuntime {
       bindingId: data.bindingId ?? undefined,
       data,
     }
-    if (this.options.shouldFocusOnClick?.(event) ?? true) void this.focusTarget(hit.target)
+    if (autoFocus && (this.options.shouldFocusOnClick?.(event) ?? true)) void this.focusTarget(hit.target)
     this.onClick(event)
   }
 
@@ -251,8 +263,8 @@ export class TwinSceneRuntime {
     if (this.disposed) return
     this.disposed = true
     this.selection = null
-    this.pointers?.dispose()
-    this.pointers = null
+    this.interactions?.dispose()
+    this.interactions = null
     this.panels.dispose()
     this.data.stop()
     this.sync.dispose()

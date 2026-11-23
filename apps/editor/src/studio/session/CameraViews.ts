@@ -47,6 +47,10 @@ export class CameraViews {
   remove(id: string): void {
     this.session.edit('删除镜头', draft => {
       draft.bookmarks = draft.bookmarks.filter(item => item.id !== id)
+      if (draft.interactions)
+        draft.interactions = draft.interactions.filter(
+          rule => rule.action.type !== 'fly-to-bookmark' || rule.action.bookmarkId !== id,
+        )
     })
   }
 

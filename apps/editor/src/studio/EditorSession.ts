@@ -2,6 +2,7 @@ import { reactive, shallowRef } from 'vue'
 import { Box3, type Matrix4, Vector3 } from 'three'
 import {
   type AssetRepository,
+  type TwinBindingTarget,
   BindingTargetResolver,
   type CameraView,
   createEmptyDocument,
@@ -23,7 +24,7 @@ import {
   transformOf,
   TwinDataRuntime,
   TwinEngine,
-  ViewerPointerEvents,
+  InteractionRuntime,
   worldMatrixOf,
 } from '@twin-studio/core'
 import type { SceneConflict } from '@/api/adapter'
@@ -97,6 +98,7 @@ export class EditorSession {
     /** 右键菜单：屏幕位置和点到的场景位置。 */
     contextMenu: null as { x: number; y: number; point: [number, number, number] | null } | null,
     hasClipboard: false,
+    previewEventName: '',
     /** 正在往这个标签组里放置面板。 */
     placing: null as string | null,
   })
@@ -113,7 +115,7 @@ export class EditorSession {
   private readonly resolver: BindingTargetResolver
   private readonly dataRuntime: TwinDataRuntime
   private readonly panelLayer: PanelLayer
-  private previewPointers: ViewerPointerEvents | null = null
+  private previewInteractions: InteractionRuntime | null = null
   private gizmoIds: string[] = []
   /** 已关闭：异步工作（截图、悬停检测）看到它就停止。 */
   disposed = false
@@ -504,30 +506,49 @@ export class EditorSession {
     this.engine.setHelpers({ grid: false, axes: false })
     this.engine.setOutlined('hover', [])
     this.gizmo.setVisible(false)
-    this.previewPointers = new ViewerPointerEvents(
+    const select = (target: TwinBindingTarget) => {
+      const object = this.resolver.resolve(target)
+      this.engine.setOutlined('selection', object ? [object] : [])
+      this.panelLayer.setClicked(targetNodeId(target))
+    }
+    const clear = () => {
+      this.engine.setOutlined('selection', [])
+      this.panelLayer.setClicked(null)
+    }
+    this.previewInteractions = new InteractionRuntime(
       this.canvas,
       this.engine,
       () => this.sync.roots,
       this.twin,
-      hit => {
-        const object = this.resolver.resolve(hit.target)
-        if (!object) return
-        const nodeId = targetNodeId(hit.target)
-        this.engine.setOutlined('selection', [object])
-        this.panelLayer.setClicked(nodeId)
-        void this.focusNodes([nodeId])
+      this.doc.value.interactions ?? [],
+      {
+        resolver: this.resolver,
+        select,
+        clear,
+        focus: target => this.focusNodes([targetNodeId(target)]),
+        flyToBookmark: id => {
+          const view = this.doc.value.bookmarks.find(item => item.id === id)?.view
+          return view ? this.engine.flyTo(view) : Promise.resolve(false)
+        },
+        deviceId: target => this.twin.getBindingByTarget(target)?.device.id ?? null,
+        emit: event => {
+          this.ui.previewEventName = event.eventName
+        },
       },
-      () => {
-        this.engine.setOutlined('selection', [])
-        this.panelLayer.setClicked(null)
+      (hit, autoFocus) => {
+        select(hit.target)
+        if (autoFocus) void this.focusNodes([targetNodeId(hit.target)])
       },
+      clear,
     )
   }
 
   exitPreview(): void {
-    if (!this.previewPointers) return
-    this.previewPointers.dispose()
-    this.previewPointers = null
+    if (!this.previewInteractions) return
+    this.previewInteractions.dispose()
+    this.previewInteractions = null
+    this.ui.previewEventName = ''
+    this.engine.rig.cancelFlight()
     this.panelLayer.setPlaying(false)
     this.ui.mode = 'edit'
     this.engine.setOutlined('selection', [])

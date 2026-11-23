@@ -1,3 +1,4 @@
+import type { InteractionMetadata, InteractionTrigger } from '../domain/interactions'
 /*
  * Viewer SDK 对外的类型：事件、运行时状态、公开 API。
  * 改这里要同步 packages/viewer/index.d.ts（手写的对外声明），pnpm type-check 会检查两者是否一致。
@@ -32,6 +33,8 @@ export type ViewerSelection = Readonly<{
 export type ViewerClickFocus = boolean | ((event: ViewerTargetClick) => boolean)
 
 export interface ViewerLoadedEvent {
+  /** 当前场景保存的镜头，按编辑器中的顺序。 */
+  bookmarks: ViewerBookmark[]
   projectId: string
   projectName: string
   objectCount: number
@@ -71,6 +74,17 @@ export interface ViewerTargetClick extends ViewerClickHit {
   data: ViewerObjectData
 }
 
+export interface ViewerInteractionEvent {
+  eventName: string
+  interactionId: string
+  trigger: InteractionTrigger
+  sourceTarget: Readonly<TwinBindingTarget>
+  triggerTarget: Readonly<TwinBindingTarget>
+  actionTarget: Readonly<TwinBindingTarget>
+  deviceId: string | null
+  metadata: Readonly<InteractionMetadata>
+}
+
 export interface ViewerBookmark {
   id: string
   name: string
@@ -82,6 +96,7 @@ export type TwinSceneViewerEvents = {
   loaded: [info: ViewerLoadedEvent]
   error: [message: string]
   'selection-change': [selection: ViewerSelection]
+  'interaction-event': [event: ViewerInteractionEvent]
   'target-click': [event: ViewerTargetClick]
 }
 

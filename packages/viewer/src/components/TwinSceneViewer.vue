@@ -103,6 +103,9 @@ async function load(): Promise<void> {
         quality: props.quality,
         shouldFocusOnClick: event =>
           typeof props.focusOnClick === 'function' ? props.focusOnClick(event) : props.focusOnClick,
+        onInteractionEvent: event => {
+          if (mounted && request === generation) emit('interaction-event', event)
+        },
         onSelectionChange: selection => {
           if (mounted && request === generation) emit('selection-change', selection)
         },
@@ -115,6 +118,7 @@ async function load(): Promise<void> {
     if (!mounted || request !== generation) return
     warnings.value = result
     emit('loaded', {
+      bookmarks: runtime.getBookmarks(),
       projectId: document.projectId,
       projectName: document.metadata.name ?? '',
       objectCount: document.nodes.length,

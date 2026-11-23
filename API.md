@@ -243,6 +243,10 @@ curl http://localhost:5173/api/v1/assets \
 
 外部 Vue 大屏可在 `TwinSceneViewer` 上按设备配置点击聚焦，订阅 `target-click` 取得箱子的数据，也可从设备列表调用 `selectDevice`、`focusDevice` 驱动场景。持续显示变量值时，读取同一个 Viewer 的运行时状态即可复用已有数据连接。[外部大屏接入示例](packages/viewer/README.md#外部大屏接入示例)
 
+大屏的镜头选择器使用 Viewer 的 `loaded` 事件中的 `bookmarks`，或在加载完成后调用 `getBookmarks()`。列表每项为 `{ id, name }`。用户选择后调用 `await viewer.flyToBookmark(id)`，返回布尔值表示是否切换成功。[镜头选择器示例](packages/viewer/README.md#大屏镜头选择器)
+
+物品交互规则随场景保存在 `document.interactions`，旧场景可以省略该字段。规则包含触发物体、触发事件、响应动作和启用状态。配置「通知大屏」后，外部页面订阅 Viewer 的 `interaction-event` 即可获得事件名及对应设备 ID。[物品交互事件示例](packages/viewer/README.md#物品交互事件)
+
 设备接口由场景 `dataSources` 配置，浏览器可以直连 HTTP 或 WebSocket。静态值、设备模板及绑定保存在场景 JSON 中。业务后端无需为新增设备类型提供单独接口。
 
 以设备 `ESS-001` 的数值变量 `soc` 为例。HTTP 默认打开时读取一次，可配置定时读取。若数据位置配置为 `data`，下面的 HTTP 响应会把电量更新为 72：
