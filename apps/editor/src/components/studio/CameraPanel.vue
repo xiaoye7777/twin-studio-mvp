@@ -1,13 +1,14 @@
 <script setup lang="ts">
 /** 左栏「镜头」：调好视角后添加，每个镜头是一张缩略图卡片，点击切换过去。 */
 import { ElMessage } from 'element-plus'
-import { Camera, Image as ImageIcon, RefreshCw, X } from 'lucide-vue-next'
+import { Camera, Image as ImageIcon, Pencil, RefreshCw, X } from 'lucide-vue-next'
 import { computed, nextTick, ref } from 'vue'
 import { useSession } from '@/studio/context'
 
 const session = useSession()
 const bookmarks = computed(() => session.doc.value.bookmarks)
 const renaming = ref<string | null>(null)
+const renameInputs = ref<HTMLInputElement[]>([])
 const adding = ref(false)
 
 async function add(): Promise<void> {
@@ -32,12 +33,13 @@ async function setCover(id: string): Promise<void> {
 async function startRename(id: string): Promise<void> {
   renaming.value = id
   await nextTick()
-  const input = document.querySelector<HTMLInputElement>('.camera__rename')
+  const input = renameInputs.value[0]
   input?.focus()
   input?.select()
 }
 
 function finishRename(id: string, event: Event): void {
+  if (renaming.value !== id) return
   session.cameras.rename(id, (event.target as HTMLInputElement).value)
   renaming.value = null
 }
@@ -67,16 +69,28 @@ function finishRename(id: string, event: Event): void {
           <img v-if="bookmark.thumbnail" class="camera__image" :src="bookmark.thumbnail" alt="" />
           <span v-else class="camera__image camera__image--blank" />
         </button>
-        <div class="camera__name" title="双击改名" @dblclick.stop="startRename(bookmark.id)">
+        <div class="camera__name" @click.stop>
           <input
             v-if="renaming === bookmark.id"
+            ref="renameInputs"
             class="camera__rename s-input"
+            aria-label="镜头名称"
             :value="bookmark.name"
-            @click.stop
             @blur="finishRename(bookmark.id, $event)"
-            @keydown.enter="($event.target as HTMLInputElement).blur()"
+            @keydown.enter.stop="!$event.isComposing && ($event.target as HTMLInputElement).blur()"
+            @keydown.esc.stop="!$event.isComposing && (renaming = null)"
           />
-          <span v-else>{{ bookmark.name }}</span>
+          <button
+            v-else
+            type="button"
+            class="camera__edit"
+            title="修改镜头名称"
+            :aria-label="`修改镜头名称：${bookmark.name}`"
+            @click="startRename(bookmark.id)"
+          >
+            <span>{{ bookmark.name }}</span>
+            <Pencil :size="12" aria-hidden="true" />
+          </button>
         </div>
         <button
           type="button"
@@ -148,11 +162,33 @@ function finishRename(id: string, event: Event): void {
   background: var(--s-panel);
 }
 .camera__name {
-  overflow: hidden;
   padding: 3px 6px;
   font-size: 11.5px;
+}
+.camera__edit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  min-height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.camera__edit span {
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.camera__edit svg {
+  flex: none;
+}
+.camera__edit:hover {
+  color: var(--s-accent);
 }
 .camera__rename {
   width: 100%;
