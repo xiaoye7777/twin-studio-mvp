@@ -20,6 +20,17 @@ import type { DataSourceConnectionStatus, DataSourceRuntimeState, DataSourceType
 
 export type { TwinBindingTarget } from '../domain/twin'
 
+/** 大屏与 Viewer 共用的选中项，点击空白时为 null。 */
+export type ViewerSelection = Readonly<{
+  target: Readonly<TwinBindingTarget>
+  bindingTarget: Readonly<TwinBindingTarget> | null
+  bindingId: string | null
+  deviceId: string | null
+  deviceName: string | null
+}> | null
+
+export type ViewerClickFocus = boolean | ((event: ViewerTargetClick) => boolean)
+
 export interface ViewerLoadedEvent {
   projectId: string
   projectName: string
@@ -70,6 +81,7 @@ export type ViewerQuality = 'auto' | 'low' | 'medium' | 'high'
 export type TwinSceneViewerEvents = {
   loaded: [info: ViewerLoadedEvent]
   error: [message: string]
+  'selection-change': [selection: ViewerSelection]
   'target-click': [event: ViewerTargetClick]
 }
 
@@ -92,6 +104,10 @@ export type ViewerRuntimeState = DeepReadonly<{
 }
 
 export interface TwinSceneViewerPublicApi {
+  selectTarget(target: TwinBindingTarget): boolean
+  selectDevice(deviceId: string): boolean
+  getSelection(): ViewerSelection
+  clearSelection(): void
   /** 相机聚焦到对象。 */
   focusTarget(target: TwinBindingTarget): Promise<boolean>
   /** 相机聚焦到绑定了这台设备的对象。 */

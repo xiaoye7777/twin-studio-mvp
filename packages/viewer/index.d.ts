@@ -32,6 +32,17 @@ export interface TwinRuntimeValue {
   value: number | boolean | string
   updatedAt: string
 }
+/** 大屏与 Viewer 共用的选中项，点击空白时为 null。 */
+export type ViewerSelection = Readonly<{
+  target: Readonly<TwinBindingTarget>
+  bindingTarget: Readonly<TwinBindingTarget> | null
+  bindingId: string | null
+  deviceId: string | null
+  deviceName: string | null
+}> | null
+
+export type ViewerClickFocus = boolean | ((event: ViewerTargetClick) => boolean)
+
 export interface ViewerLoadedEvent {
   projectId: string
   projectName: string
@@ -63,6 +74,12 @@ export interface ViewerTargetClick {
   device?: TwinDevice
   bindingId?: string
   data: ViewerObjectData
+}
+export type TwinSceneViewerEvents = {
+  loaded: [info: ViewerLoadedEvent]
+  error: [message: string]
+  'selection-change': [selection: ViewerSelection]
+  'target-click': [event: ViewerTargetClick]
 }
 export interface ViewerBookmark {
   id: string
@@ -97,6 +114,10 @@ export type ViewerRuntimeState = DeepReadonly<{
   dataSourceStates: DataSourceRuntimeState[]
 }> & { getRuntimeValue(bindingId: string, variableKey: string): DeepReadonly<TwinRuntimeValue> | null }
 export interface TwinSceneViewerPublicApi {
+  selectTarget(target: TwinBindingTarget): boolean
+  selectDevice(deviceId: string): boolean
+  getSelection(): ViewerSelection
+  clearSelection(): void
   /** Moves the camera to an object. */
   focusTarget(target: TwinBindingTarget): Promise<boolean>
   /** Moves the camera to the object bound to a device. */
@@ -203,20 +224,28 @@ export interface SceneDocumentV2 {
   bindings: TwinBinding[]
   bookmarks: CameraBookmark[]
 }
-export const TwinSceneViewer: DefineComponent<{
-  /** The scene JSON: a parsed object, or a URL that returns it. */
-  scene: object | string
-  /** The scene only holds asset ids; this says where each file is. */
-  resolveAsset: AssetResolver
-  /** Render quality; 'auto' adapts to the device and screen. */
-  quality?: ViewerQuality
-  /** Show the scene's info panels. Default true; hosts with their own UI can turn it off. */
-  panels?: boolean
-  /** Auth headers for HTTP data sources: tokens never live in the scene, the host provides them. */
-  dataRequestHeaders?: (
-    source: Extract<ProjectDataSource, { type: 'http' }>,
-  ) => Record<string, string> | Promise<Record<string, string> | undefined> | undefined
-}>
+export const TwinSceneViewer: DefineComponent<
+  {
+    /** The scene JSON: a parsed object, or a URL that returns it. */
+    scene: object | string
+    /** The scene only holds asset ids; this says where each file is. */
+    resolveAsset: AssetResolver
+    focusOnClick?: ViewerClickFocus
+    onSelectionChange?: (selection: ViewerSelection) => void
+    onTargetClick?: (event: ViewerTargetClick) => void
+    onLoaded?: (info: ViewerLoadedEvent) => void
+    onError?: (message: string) => void
+    /** Render quality; 'auto' adapts to the device and screen. */
+    quality?: ViewerQuality
+    /** Show the scene's info panels. Default true; hosts with their own UI can turn it off. */
+    panels?: boolean
+    /** Auth headers for HTTP data sources: tokens never live in the scene, the host provides them. */
+    dataRequestHeaders?: (
+      source: Extract<ProjectDataSource, { type: 'http' }>,
+    ) => Record<string, string> | Promise<Record<string, string> | undefined> | undefined
+  },
+  TwinSceneViewerPublicApi
+>
 export type ProjectDataSource = {
   id: string
   name: string

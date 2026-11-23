@@ -4,7 +4,13 @@
  */
 import { reactive } from 'vue'
 import { Box3, type Object3D } from 'three'
-import { targetNodeId, type TwinBindingTarget } from '../../domain/twin'
+import {
+  targetForNode,
+  targetNodeId,
+  twinBindingTargetKey,
+  type TwinBinding,
+  type TwinBindingTarget,
+} from '../../domain/twin'
 import type { SceneDocumentV2 } from '../../domain/scene'
 import type {
   TwinSceneViewerEvents,
@@ -13,6 +19,7 @@ import type {
   ViewerObjectData,
   ViewerQuality,
   ViewerTargetClick,
+  ViewerSelection,
 } from '../../contract/viewerContract'
 import { createViewerRuntimeState } from './viewerRuntimeState'
 import type { AssetRepository } from '../../infrastructure/assets/AssetRepository'
@@ -20,7 +27,7 @@ import { TwinEngine } from '../../engine/TwinEngine'
 import { PanelLayer } from '../panels/PanelLayer'
 import { dataOwnerOf } from '../panels/resolvePanel'
 import { SceneSync } from '../scene/SceneSync'
-import { BindingTargetResolver } from './BindingTargetResolver'
+import { bindingTargetFromObject, BindingTargetResolver } from './BindingTargetResolver'
 import { createTwinState } from './createTwinState'
 import { readObjectData } from './readObjectData'
 import { TwinDataRuntime, type TwinDataRuntimeOptions } from './TwinDataRuntime'
@@ -28,6 +35,8 @@ import { ViewerPointerEvents } from './ViewerPointerEvents'
 
 export interface TwinSceneRuntimeOptions {
   quality?: ViewerQuality
+  shouldFocusOnClick?: (event: ViewerTargetClick) => boolean
+  onSelectionChange?: (selection: ViewerSelection) => void
   /** HTTP 接口的认证请求头（Token 不进场景文件，由集成方提供）。 */
   dataRequestHeaders?: TwinDataRuntimeOptions['requestHeaders']
   /** 显示场景里的信息面板。默认显示；宿主有自己的界面时可以关掉。 */
@@ -50,6 +59,7 @@ export class TwinSceneRuntime {
   private pointers: ViewerPointerEvents | null = null
   private disposed = false
   private started = false
+  private selection: ViewerSelection = null
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -86,8 +96,7 @@ export class TwinSceneRuntime {
         this.twin,
         hit => this.handleClick(hit),
         () => {
-          this.highlight(null)
-          this.panels.setClicked(null)
+          this.clearSelection()
           this.options.onBlank?.()
         },
       )
@@ -104,17 +113,63 @@ export class TwinSceneRuntime {
   /** 点击对象：高亮、相机聚焦，并把对象的数据交给宿主。 */
   private handleClick(hit: ViewerClickHit): void {
     if (this.disposed) return
-    const data = this.getObjectData(hit.target)
+    const binding = this.resolveBinding(hit.target, hit.bindingTarget)
+    const data = this.objectData(hit.target, binding)
     if (!data) return
-    this.highlight(this.getRuntimeObject(hit.target))
-    this.panels.setClicked(targetNodeId(hit.target))
-    void this.focusTarget(hit.target)
-    this.onClick({
-      ...hit,
-      device: hit.device ?? data.device ?? undefined,
-      bindingId: hit.bindingId ?? data.bindingId ?? undefined,
+    this.updateSelection(hit.target, binding)
+    const event = {
+      target: hit.target,
+      bindingTarget: binding ? { ...binding.target } : undefined,
+      device: data.device ?? undefined,
+      bindingId: data.bindingId ?? undefined,
       data,
+    }
+    if (this.options.shouldFocusOnClick?.(event) ?? true) void this.focusTarget(hit.target)
+    this.onClick(event)
+  }
+
+  getSelection(): ViewerSelection {
+    return this.selection
+  }
+
+  selectDevice(deviceId: string): boolean {
+    const binding = this.resolvedDevice(deviceId)
+    return binding ? this.selectTarget(binding.target) : false
+  }
+
+  selectTarget(target: TwinBindingTarget): boolean {
+    if (!this.getRuntimeObject(target)) return false
+    this.updateSelection(target, this.resolveBinding(target))
+    return true
+  }
+
+  private updateSelection(target: TwinBindingTarget, binding: TwinBinding | null): void {
+    this.highlight(this.getRuntimeObject(target))
+    this.panels.setClicked(targetNodeId(target))
+    const bindingId = binding?.id ?? null
+    if (
+      this.selection &&
+      twinBindingTargetKey(this.selection.target) === twinBindingTargetKey(target) &&
+      this.selection.bindingId === bindingId
+    )
+      return
+    this.selection = Object.freeze({
+      target: Object.freeze({ ...target }),
+      bindingTarget: binding ? Object.freeze({ ...binding.target }) : null,
+      bindingId,
+      deviceId: binding?.device.id ?? null,
+      deviceName: binding?.device.name ?? null,
     })
+    this.options.onSelectionChange?.(this.selection)
+  }
+
+  clearSelection(): void {
+    if (this.disposed) return
+    this.highlight(null)
+    this.panels.setClicked(null)
+    if (!this.selection) return
+    this.selection = null
+    this.options.onSelectionChange?.(null)
   }
 
   private highlight(object: Object3D | null): void {
@@ -126,9 +181,35 @@ export class TwinSceneRuntime {
   }
 
   getObjectData(target: TwinBindingTarget): ViewerObjectData | null {
+    return this.objectData(target, this.resolveBinding(target))
+  }
+
+  private objectData(target: TwinBindingTarget, binding: TwinBinding | null): ViewerObjectData | null {
+    const node = this.document?.nodes.find(item => item.id === targetNodeId(target))
+    return node && !this.disposed ? readObjectData(node, this.twin, binding?.target ?? node) : null
+  }
+
+  private resolveBinding(target: TwinBindingTarget, hitBinding?: TwinBindingTarget): TwinBinding | null {
     const document = this.document
-    const node = document?.nodes.find(item => item.id === targetNodeId(target))
-    return document && node && !this.disposed ? readObjectData(node, this.twin, dataOwnerOf(document, node)) : null
+    if (!document || this.disposed) return null
+    const node = document.nodes.find(item => item.id === targetNodeId(target))
+    if (!node) return null
+    const owner = dataOwnerOf(document, node)
+    // 命中的模型部件、模型本身、外层分组都可能是设备的绑定位置。
+    const direct = this.twin.getBindingByTarget(hitBinding ?? target)
+    if (direct) return direct
+    for (let object = this.sync.objectFor(owner.id); object; object = object.parent) {
+      const identity = bindingTargetFromObject(object)
+      const binding = identity && this.twin.getBindingByTarget(identity)
+      if (binding) return binding
+    }
+    return this.twin.getBindingByTarget(targetForNode(owner))
+  }
+
+  private resolvedDevice(deviceId: string): TwinBinding | undefined {
+    return this.twin.bindings.find(
+      item => item.device.id === deviceId && this.twin.resolutionByBindingId[item.id] === 'resolved',
+    )
   }
 
   async focusTarget(target: TwinBindingTarget): Promise<boolean> {
@@ -136,14 +217,11 @@ export class TwinSceneRuntime {
     if (!object) return false
     const box = new Box3().setFromObject(object, true)
     this.panels.expandWithPanels(box, targetNodeId(target))
-    await this.engine.focusBox(box)
-    return true
+    return this.engine.focusBox(box)
   }
 
   async focusDevice(deviceId: string): Promise<boolean> {
-    const binding = this.twin.bindings.find(
-      item => item.device.id === deviceId && this.twin.resolutionByBindingId[item.id] === 'resolved',
-    )
+    const binding = this.resolvedDevice(deviceId)
     return binding ? this.focusTarget(binding.target) : false
   }
 
@@ -172,6 +250,7 @@ export class TwinSceneRuntime {
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
+    this.selection = null
     this.pointers?.dispose()
     this.pointers = null
     this.panels.dispose()

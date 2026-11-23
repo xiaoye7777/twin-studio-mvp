@@ -1,4 +1,4 @@
-# @twin-studio/viewer 0.8.0
+# @twin-studio/viewer 0.9.0
 
 Vue 3 项目运行组件。支持 Node 20.16+ 和 pnpm 10.20.0；加载编辑器保存的场景 JSON，按资源 ID 取模型文件，恢复模型、设备绑定、实时数据、镜头和信息面板。
 
@@ -33,13 +33,14 @@ function onClick(event: ViewerTargetClick) {
 | --- | --- | --- |
 | `scene` | 必填 | 场景 JSON：解析好的对象，或一个返回 JSON 的地址。换一份就重新加载 |
 | `resolve-asset` | 必填 | 资源 ID → 模型文件。返回地址（SDK 自己下载），或 `Blob`（需要带登录信息时宿主下载好再给），可以是异步函数 |
+| `focus-on-click` | `true` | 宿主控制点击聚焦。可传布尔值，或传入函数，按点击的设备 / 场景实例返回布尔值 |
 | `quality` | `auto` | 画质：`auto`、`low`、`medium`、`high` |
 | `panels` | `true` | 显示场景里的信息面板；宿主有自己的界面时设为 `false` |
 | `data-request-headers` | 无 | HTTP 接口的认证请求头。Token 不进场景 JSON，由集成方提供 |
 
 ## 双向联动
 
-**场景 → 大屏**：点击对象时，相机聚焦到它，并发出 `target-click`，内容里带着这个对象的数据。
+**场景 → 大屏**：点击对象时，Viewer 选中它，并发出带设备数据的 `target-click`。默认同时聚焦；关闭点击聚焦仍会选中并回传数据。
 
 ```ts
 interface ViewerTargetClick {
@@ -70,7 +71,62 @@ viewer.value?.flyToBookmark(id)                                           // 切
 viewer.value?.resetView()                                                 // 回到打开场景时的视角
 ```
 
-其他事件只有 `loaded`（加载完成）和 `error`（加载失败）。
+### 外部大屏接入示例
+
+下面是一个外部 Vue 3 页面。它接收后端返回的场景 document，使用 Viewer 对应的设备绑定生成列表。点击列表中的设备会使 Viewer 选中并聚焦到对应箱子；在三维画面点击箱子会选中列表项，并更新右侧变量。示例从 Viewer 的实时状态读取数值，数据源后续更新时也会刷新。
+
+```vue
+<script setup lang="ts">
+import { computed, ref, shallowRef } from 'vue'
+import {
+  TwinSceneViewer,
+  type TwinSceneViewerPublicApi,
+  type ViewerRuntimeState,
+  type ViewerSelection,
+  type ViewerTargetClick,
+} from '@twin-studio/viewer'
+import '@twin-studio/viewer/style.css'
+
+defineProps<{ scene: object }>()
+const viewer = ref<TwinSceneViewerPublicApi | null>(null)
+const state = shallowRef<ViewerRuntimeState | null>(null)
+const selection = shallowRef<ViewerSelection>(null)
+const devices = computed(() => [...new Map(state.value?.bindings.map(b => [b.device.id, b.device] as const)).values()])
+const binding = computed(() => state.value?.bindings.find(b => b.id === selection.value?.bindingId))
+
+// 实际项目可从大屏配置中读取设备编号。这里让点击 ESS-001 时聚焦，其他箱子只选中并回传数据。
+const clickFocus = (hit: ViewerTargetClick) => hit.data.device?.id === 'ESS-001'
+async function openBox(id: string) {
+  const api = viewer.value
+  if (api?.selectDevice(id)) await api.focusDevice(id)
+}
+</script>
+
+<template>
+  <section style="height: 65vh">
+    <TwinSceneViewer ref="viewer" :scene="scene"
+      :resolve-asset="id => `/api/v1/assets/${encodeURIComponent(id)}/content`"
+      :focus-on-click="clickFocus"
+      @loaded="state = viewer?.getRuntimeState() ?? null"
+      @selection-change="selection = $event" />
+  </section>
+  <button v-for="device in devices" :key="device.id"
+    :aria-pressed="selection?.deviceId === device.id" @click="openBox(device.id)">
+    {{ device.name }}
+  </button>
+  <dl v-if="binding">
+    <template v-for="v in binding.variables" :key="v.id">
+      <dt>{{ v.name }}</dt>
+      <dd>{{ state?.getRuntimeValue(binding.id, v.key)?.value ?? '—' }} {{ v.unit }}</dd>
+    </template>
+  </dl>
+</template>
+```
+
+- **一次点击的数据**可在 `@target-click` 中直接读取 `event.data`。其中包含实例名称、绑定设备、变量值、单位与更新时间；未绑定时 `device` 为 null，`values` 为空数组。点击箱子内部网格时可读到该网格、箱子或上层分组绑定的设备。
+- **选择同步**使用 `selection-change`。用户点场景和宿主调用 `selectTarget(target)` / `selectDevice(id)` 都会更新选中项；重复选择同一项不会重复通知。点空白或调用 `clearSelection()` 会取消选择，`getSelection()` 可读取当前状态。宿主主动选择不会再触发 `target-click`。
+- **区分实例**时使用场景节点 ID，例如先调用 `selectTarget({ type: 'asset-instance', instanceId: 'node_01' })`，再用同一目标调用 `focusTarget`。模型库的 assetId 可以被多个箱子共用。多个实例绑定同一设备时，`selectDevice` 和 `focusDevice` 使用首个已解析的绑定。
+- 在 `loaded` 后操作 Viewer。选中方法返回是否找到目标；聚焦方法异步返回结果。`error` 会报告场景加载失败。
 
 ## 数据
 

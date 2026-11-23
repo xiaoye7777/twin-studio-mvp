@@ -14,6 +14,7 @@ import {
   type TwinSceneViewerEvents,
   type TwinSceneViewerPublicApi,
   UrlAssetRepository,
+  type ViewerClickFocus,
   type ViewerQuality,
 } from '@twin-studio/core'
 
@@ -25,12 +26,13 @@ const props = withDefaults(
     resolveAsset: AssetResolver
     /** 画质；auto 按设备和屏幕自适应。 */
     quality?: ViewerQuality
+    focusOnClick?: ViewerClickFocus
     /** 显示场景里的信息面板；宿主有自己的界面时可以关掉。 */
     panels?: boolean
     /** HTTP 接口的认证请求头：Token 不进场景 JSON，由集成方提供。 */
     dataRequestHeaders?: TwinSceneRuntimeOptions['dataRequestHeaders']
   }>(),
-  { quality: 'auto', panels: true, dataRequestHeaders: undefined },
+  { quality: 'auto', focusOnClick: true, panels: true, dataRequestHeaders: undefined },
 )
 const emit = defineEmits<TwinSceneViewerEvents>()
 const canvas = ref<HTMLCanvasElement>()
@@ -67,6 +69,7 @@ async function readScene(signal: AbortSignal): Promise<{ document: SceneDocument
 
 async function load(): Promise<void> {
   const request = ++generation
+  if (session.value?.getSelection()) emit('selection-change', null)
   release()
   canvasKey.value += 1
   await nextTick()
@@ -98,6 +101,11 @@ async function load(): Promise<void> {
       },
       {
         quality: props.quality,
+        shouldFocusOnClick: event =>
+          typeof props.focusOnClick === 'function' ? props.focusOnClick(event) : props.focusOnClick,
+        onSelectionChange: selection => {
+          if (mounted && request === generation) emit('selection-change', selection)
+        },
         panels: props.panels,
         dataRequestHeaders: source => props.dataRequestHeaders?.(source),
       },
@@ -149,6 +157,10 @@ onBeforeUnmount(() => {
 })
 
 const publicApi: TwinSceneViewerPublicApi = {
+  selectTarget: target => session.value?.selectTarget(target) ?? false,
+  selectDevice: id => session.value?.selectDevice(id) ?? false,
+  getSelection: () => session.value?.getSelection() ?? null,
+  clearSelection: () => session.value?.clearSelection(),
   focusTarget: (target: TwinBindingTarget) => session.value?.focusTarget(target) ?? Promise.resolve(false),
   focusDevice: (id: string) => session.value?.focusDevice(id) ?? Promise.resolve(false),
   getObjectData: (target: TwinBindingTarget) => session.value?.getObjectData(target) ?? null,

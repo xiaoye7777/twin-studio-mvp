@@ -20,6 +20,8 @@ export type {
   TwinSceneViewerPublicApi,
   TwinVariableDefinition,
   ViewerBookmark,
+  ViewerClickFocus,
+  ViewerSelection,
   ViewerLoadedEvent,
   ViewerObjectData,
   ViewerObjectValue,
