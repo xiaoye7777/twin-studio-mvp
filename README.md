@@ -23,6 +23,7 @@ pnpm dev
 | `apps/editor` | 编辑器：3D 场景列表、资源库、场景编辑器 |
 | `packages/core` | 场景格式、渲染引擎、数据运行时，编辑器和 Viewer 共用 |
 | `packages/viewer` | 给数据大屏用的 Viewer SDK，用法见[它的说明](packages/viewer/README.md) |
+| [数据大屏接入指南](DASHBOARD_INTEGRATION.md) | 给大屏同事和 GLM 5.4 的安装、鉴权、双向联动与验收步骤 |
 | [API.md](API.md) | 前后端联调、对象存储与现有接口 |
 
 ## 编辑器怎么用
