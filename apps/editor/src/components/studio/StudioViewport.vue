@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** 三维视口：画布、左侧编辑快捷栏、顶部固定视角、接收拖进来的模型、放置面板和预览的提示、右键菜单。 */
 import { ElMessage } from 'element-plus'
-import { Expand, Focus, MousePointer2, Move, Rotate3d, Scaling } from 'lucide-vue-next'
+import { Expand, MousePointer2, Move, Rotate3d, Scaling } from 'lucide-vue-next'
 import { computed, inject, ref } from 'vue'
 import { ASSET_DRAG_MIME, readAssetDrag } from '@/library/assetDrag'
 import { SessionKey } from '@/studio/context'
@@ -97,9 +97,6 @@ function onDrop(event: DragEvent): void {
           右
         </button>
         <span class="viewport__sep" />
-        <button class="s-icon-btn" title="聚焦选中（F）" data-testid="view-focus" @click="session.focusSelection()">
-          <Focus :size="14" />
-        </button>
         <button class="s-icon-btn" title="全景" data-testid="view-all" @click="session.engine.fitAll()">
           <Expand :size="14" />
         </button>

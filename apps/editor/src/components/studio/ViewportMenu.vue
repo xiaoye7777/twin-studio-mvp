@@ -23,7 +23,6 @@ const sections = computed<MenuSections>(() => {
     const onlyPanels = nodes.every(node => node.kind === 'panel')
     return [
       [
-        { label: '聚焦', shortcut: 'F', action: () => void session.focusSelection() },
         { label: '复制', shortcut: `${mod}C`, action: () => session.nodes.copySelection() },
         ...paste,
         { label: '创建副本', shortcut: `${mod}D`, action: () => session.nodes.duplicateSelection() },

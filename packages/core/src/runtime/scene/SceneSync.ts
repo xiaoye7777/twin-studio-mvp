@@ -24,6 +24,7 @@ import {
   createLightObject,
   disposeOwned,
 } from './nodeObjects'
+import { ModelMaterials } from './modelMaterial'
 import { PanelObject } from '../panels/PanelObject'
 import { ImportedAssetResourceRegistry } from './ImportedAssetResourceRegistry'
 import { setEditorMetadata } from './objectMetadata'
@@ -44,6 +45,7 @@ export interface SceneSyncResult {
 }
 
 interface MountedNode {
+  materials?: ModelMaterials
   /** 上次应用到 object 的节点；还没应用过是 null。 */
   node: SceneNodeV2 | null
   object: Object3D
@@ -103,6 +105,10 @@ export class SceneSync {
 
   objectFor(nodeId: string): Object3D | null {
     return this.mounted.get(nodeId)?.object ?? null
+  }
+
+  modelBaseLook(nodeId: string) {
+    return this.mounted.get(nodeId)?.materials?.baseLook()
   }
 
   /** 对象属于哪个文档节点（从模型内部的网格往上找）。 */
@@ -185,6 +191,11 @@ export class SceneSync {
         entry.object.name = node.name
         entry.object.visible = node.visible
         applySceneTransform(entry.object, node.transform)
+        if (
+          node.kind === 'model' &&
+          node.model.material !== (entry.node?.kind === 'model' ? entry.node.model.material : undefined)
+        )
+          entry.materials?.apply(node.model.material)
         entry.node = node
       }
 
@@ -274,7 +285,7 @@ export class SceneSync {
         assetId: node.model.assetId,
         instanceId: node.id,
       })
-      return { node: null, object: this.tag(model, node) }
+      return { node: null, object: this.tag(model, node), materials: new ModelMaterials(model) }
     } catch (error) {
       this.assertActive()
       this.failed.set(node.id, node.model.assetId)
@@ -302,6 +313,7 @@ export class SceneSync {
   }
 
   private disposeNode(entry: MountedNode): void {
+    entry.materials?.dispose()
     if (entry.object instanceof PanelObject) entry.object.dispose()
     else if (entry.node && !['model', 'group', 'panel-group'].includes(entry.node.kind)) disposeOwned(entry.object)
   }

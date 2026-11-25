@@ -68,6 +68,18 @@ function withoutUnsupported(raw: Record<string, unknown>, dropped: string[]): Re
       return false
     })
   }
+  // Older v2 documents can contain retired object annotations, including inside saved alarm recipes.
+  const supportedEffect = (atom: unknown) =>
+    !(isRecord(atom) && ['floating-label', 'data-label', 'icon-marker'].includes(String(atom.kind)))
+  if (Array.isArray(raw.effects)) next.effects = raw.effects.filter(supportedEffect)
+  if (Array.isArray(raw.visualRules)) {
+    next.visualRules = raw.visualRules.map(rule => {
+      if (!isRecord(rule) || !isRecord(rule.template) || !Array.isArray(rule.template.effects)) return rule
+      const effects = rule.template.effects.filter(supportedEffect)
+      if (effects.length === rule.template.effects.length) return rule
+      return { ...rule, template: effects.length ? { ...rule.template, effects } : null }
+    })
+  }
   if (Array.isArray(raw.interactions))
     next.interactions = raw.interactions.filter(rule => {
       const type = isRecord(rule) && isRecord(rule.action) ? rule.action.type : null

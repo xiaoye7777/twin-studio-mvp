@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, provide, ref, shallowRef } from '
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import type { ProjectInfo } from '@/api/adapter'
 import { assetRepository, HttpSceneRepository, projectApi } from '@/api/repositories'
+import ResizeHandle from '@/components/studio/ResizeHandle.vue'
 import AssetDock from '@/components/studio/AssetDock.vue'
 import BatchBindDialog from '@/components/studio/BatchBindDialog.vue'
 import DeviceTypeManager from '@/components/studio/DeviceTypeManager.vue'
@@ -30,6 +31,9 @@ provide(SessionKey, session)
 provide(ShellKey, shell)
 useStudioShortcuts(session, () => void topBar.value?.save())
 
+const leftWidth = ref(264)
+const rightWidth = ref(316)
+const dockHeight = ref(162)
 const preview = computed(() => session.value?.ui.mode === 'preview')
 const dirty = () => session.value?.store.isDirty ?? false
 
@@ -79,12 +83,25 @@ onBeforeUnmount(() => {
     <TopBar v-if="session" ref="topBar" :project-name="project?.name ?? ''" />
     <div v-else class="studio__topbar-placeholder" />
     <div class="studio__body">
-      <LeftPanel v-if="session?.ui.ready && !preview" class="studio__left" />
+      <div v-if="session?.ui.ready && !preview" class="studio__side studio__left" :style="{ width: leftWidth + 'px' }">
+        <LeftPanel />
+        <ResizeHandle v-model="leftWidth" edge="right" :min="172" :max="520" />
+      </div>
       <div class="studio__center">
         <StudioViewport ref="viewport" />
-        <AssetDock v-if="session?.ui.ready && !preview" />
+        <div v-if="session?.ui.ready && !preview" class="studio__dock" :style="{ height: dockHeight + 'px' }">
+          <ResizeHandle v-model="dockHeight" edge="top" :min="92" :max="650" />
+          <AssetDock />
+        </div>
       </div>
-      <InspectorPanel v-if="session?.ui.ready && !preview" class="studio__right" />
+      <div
+        v-if="session?.ui.ready && !preview"
+        class="studio__side studio__right"
+        :style="{ width: rightWidth + 'px' }"
+      >
+        <InspectorPanel />
+        <ResizeHandle v-model="rightWidth" edge="left" :min="230" :max="600" />
+      </div>
     </div>
     <DeviceTypeManager v-if="session?.ui.ready && shell.managingDeviceTypes" />
     <BatchBindDialog v-if="session?.ui.ready" />
@@ -100,13 +117,26 @@ onBeforeUnmount(() => {
   display: flex;
   min-height: 0;
 }
+.studio__side,
+.studio__dock {
+  position: relative;
+  flex: none;
+}
+.studio__side {
+  max-width: 37%;
+}
+.studio__side > :first-child {
+  height: 100%;
+}
+.studio__dock {
+  max-height: 62%;
+}
 .studio__left {
-  width: 264px;
+  max-width: 32%;
   flex: none;
   border-right: 1px solid var(--s-line);
 }
 .studio__right {
-  width: 316px;
   flex: none;
   border-left: 1px solid var(--s-line);
 }

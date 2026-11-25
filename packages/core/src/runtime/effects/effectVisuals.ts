@@ -28,21 +28,11 @@ import {
 } from 'three'
 import type { EffectInstance } from '../../domain/effects'
 import { sceneTime } from '../scene/nodeObjects'
-import { TextSprite } from '../scene/textSprite'
-
-/** Live device data for data labels: a title and "name\tvalue" rows. */
-export interface EffectDataLines {
-  title: string
-  rows: string[]
-}
-
 export interface EffectFrame {
   bounds: Box3
   size: Vector3
   center: Vector3
   time: number
-  /** Device data for data-label effects (null when the target has no binding). */
-  data: EffectDataLines | null
 }
 
 export interface EffectVisual {
@@ -64,8 +54,7 @@ function additive(color: string, opacity: number): MeshBasicMaterial {
 
 function disposeTree(object: Object3D): void {
   object.traverse(node => {
-    if (node instanceof TextSprite) node.dispose()
-    else if (node instanceof Mesh || node instanceof LineSegments) {
+    if (node instanceof Mesh || node instanceof LineSegments) {
       node.geometry.dispose()
       ;(node.material as Material).dispose()
     }
@@ -265,47 +254,6 @@ function beam(effect: EffectInstance): EffectVisual {
   })
 }
 
-function floatingLabel(effect: EffectInstance): EffectVisual {
-  const { color, opacity, text, padding, scale } = effect.parameters
-  // Labels produced by alarm rules outrank everything else when labels collide.
-  const sprite = new TextSprite(
-    { lines: [text || ' '], style: 'tag', color, background: '#0d1219', size: scale ?? 1, opacity },
-    effect.id.startsWith('rule:') ? 4 : 2,
-  )
-  return visual(sprite, ({ bounds, center }) => {
-    sprite.position.set(center.x, bounds.max.y + padding + 0.2, center.z)
-  })
-}
-
-function dataLabel(effect: EffectInstance): EffectVisual {
-  const { color, opacity, text, padding, scale } = effect.parameters
-  const sprite = new TextSprite(undefined, 2)
-  return visual(sprite, ({ bounds, center, data }) => {
-    sprite.position.set(center.x, bounds.max.y + padding + 0.2, center.z)
-    const rows = data?.rows.length ? data.rows : ['暂无实时数据\t—']
-    sprite.setContent({
-      lines: [text || data?.title || '设备', ...rows],
-      style: 'panel',
-      color,
-      background: '#0b1118',
-      size: scale ?? 1,
-      opacity,
-    })
-  })
-}
-
-function iconMarker(effect: EffectInstance): EffectVisual {
-  const { color, text, speed, scale, height } = effect.parameters
-  const sprite = new TextSprite(
-    { lines: [text || '●'], style: 'pin', color, background: '#0d1219', size: scale ?? 1 },
-    effect.id.startsWith('rule:') ? 4 : 2,
-  )
-  return visual(sprite, ({ bounds, center, time }) => {
-    const bob = speed === 0 ? 0 : Math.sin(time * speed * 2.5) * 0.25
-    sprite.position.set(center.x, bounds.max.y + (height ?? 2) + bob, center.z)
-  })
-}
-
 const factories: Partial<Record<EffectInstance['kind'], (effect: EffectInstance) => EffectVisual>> = {
   'box-glow': boxGlow,
   'ground-pulse': groundPulse,
@@ -313,9 +261,6 @@ const factories: Partial<Record<EffectInstance['kind'], (effect: EffectInstance)
   radar,
   fence,
   beam,
-  'floating-label': floatingLabel,
-  'data-label': dataLabel,
-  'icon-marker': iconMarker,
 }
 
 /** A helper object for an effect, or null for effects applied to the target itself (outline, highlight). */

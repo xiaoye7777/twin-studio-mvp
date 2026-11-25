@@ -432,12 +432,6 @@ export class EditorSession {
     this.refreshSelectionVisuals()
   }
 
-  async focusSelection(): Promise<void> {
-    const ids = this.selection.value.filter(id => this.sync.objectFor(id))
-    if (ids.length) await this.focusNodes(ids)
-    else await this.engine.fitAll()
-  }
-
   /** 相机框住这些节点和它们显示着的面板。 */
   private focusNodes(ids: readonly string[]): Promise<boolean> {
     const box = new Box3()
@@ -507,7 +501,7 @@ export class EditorSession {
 
   // ================================================================ 预览
 
-  /** 预览：和 Viewer SDK 看到的一样，点击对象相机聚焦，面板按模板的显示方式出现。 */
+  /** 预览：和 Viewer SDK 看到的一样，点击对象执行配置的交互，面板按模板的显示方式出现。 */
   enterPreview(): void {
     if (this.ui.mode === 'preview') return
     this.panels.stopPlacing()
@@ -547,10 +541,7 @@ export class EditorSession {
           this.ui.previewEventName = event.eventName
         },
       },
-      (hit, autoFocus) => {
-        select(hit.target)
-        if (autoFocus) void this.focusNodes([targetNodeId(hit.target)])
-      },
+      hit => select(hit.target),
       clear,
     )
   }

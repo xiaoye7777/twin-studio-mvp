@@ -1,6 +1,6 @@
 # 数据大屏接入 Twin Studio 3D 场景
 
-给在**数据大屏仓库**工作的 GLM 5.4。本文对应 `@twin-studio/viewer@0.12.0`、Vue 3 和 v2 场景文档。交付目标是让用户能在大屏看到已保存的场景、点击箱子查看数据、从设备列表聚焦箱子，以及选择镜头切换视角。
+给在**数据大屏仓库**工作的 GLM 5.4。本文对应 `@twin-studio/viewer@0.13.0`、Vue 3 和 v2 场景文档。交付目标是让用户能在大屏看到已保存的场景、点击箱子查看数据、从设备列表聚焦箱子，以及选择镜头切换视角。
 
 **最小接入只有一行：** `<TwinSceneViewer :scene="sceneDocument" />`。大屏负责选择项目、读取场景和展示业务界面。Viewer 负责模型 ID 去重、批量取下载地址、从对象存储下载文件、渲染场景，以及运行场景里保存的数据源与交互规则。
 
@@ -16,10 +16,10 @@ mkdir -p release
 (cd packages/viewer && npm pack --pack-destination ../../release)
 ```
 
-- 将 `release/twin-studio-viewer-0.12.0.tgz` 交给大屏同事。以下命令在**大屏前端项目**执行，假设收到的包已放入项目的 `vendor/`。使用项目现有的 Vue 3.5（兼容范围 `^3.5.0`），Three.js 版本为 `0.184.0`。团队或 CI 通过同一份包或内网制品库安装。
+- 将 `release/twin-studio-viewer-0.13.0.tgz` 交给大屏同事。以下命令在**大屏前端项目**执行，假设收到的包已放入项目的 `vendor/`。使用项目现有的 Vue 3.5（兼容范围 `^3.5.0`），Three.js 版本为 `0.184.0`。团队或 CI 通过同一份包或内网制品库安装。
 
 ```sh
-pnpm add ./vendor/twin-studio-viewer-0.12.0.tgz three@0.184.0
+pnpm add ./vendor/twin-studio-viewer-0.13.0.tgz three@0.184.0
 pnpm list @twin-studio/viewer vue three --depth=0
 ```
 
@@ -44,7 +44,7 @@ pnpm list @twin-studio/viewer vue three --depth=0
 
 SDK 默认先请求 `GET /api/v1/assets/by-ids?ids=A&ids=B`，根据返回的 `{id, fileId}` 再请求 `GET /api/v1/files/download-urls?ids=143&ids=201`，按 `fileId` 匹配 `downloadUrl`。若资产记录已含 `{id, downloadUrl}`，该资源跳过第二步。每批最多 64 个不同 ID。地址直接取自业务后端，模型字节由浏览器从对象存储读取。
 
-内网只改了路径和请求头时，在一个地方配置 `asset-api` 即可。SDK 0.12.0 的批量协议使用 GET、重复的 `ids` 参数和 `{code: 0, data: [...]}` 响应。如果实际方法或响应结构不同，让接入层或网关统一转换成该协议。业务页面只传场景。旧页面显式传入 `resolve-asset` 会覆盖自动加载；迁到批量模式时移除这个属性。凭据留在登录会话中，场景 JSON 只保存资源引用及数据源配置。[批量请求和响应示例](API.md#正式环境的模型下载)
+内网只改了路径和请求头时，在一个地方配置 `asset-api` 即可。SDK 0.13.0 的批量协议使用 GET、重复的 `ids` 参数和 `{code: 0, data: [...]}` 响应。如果实际方法或响应结构不同，让接入层或网关统一转换成该协议。业务页面只传场景。旧页面显式传入 `resolve-asset` 会覆盖自动加载；迁到批量模式时移除这个属性。凭据留在登录会话中，场景 JSON 只保存资源引用及数据源配置。[批量请求和响应示例](API.md#正式环境的模型下载)
 
 ## 4. 可直接运行的 Vue 接入组件
 
@@ -161,7 +161,7 @@ function interaction(event: ViewerInteractionEvent) {
 
 | 大屏需求 | 使用方式 |
 | --- | --- |
-| 点击箱子聚焦并显示本次数据 | 默认点击聚焦。`@target-click` 的 `event.data` 有实例名称、设备、绑定 ID、变量值和更新时间。未绑定时 `device` 为 null。若只想让部分设备聚焦，可传 `:focus-on-click="hit => hit.data.device?.id === 'ESS-001'"` |
+| 点击箱子聚焦并显示本次数据 | 默认点击只选中并回传数据。`@target-click` 的 `event.data` 有实例名称、设备、绑定 ID、变量值和更新时间。未绑定时 `device` 为 null。若只想让部分设备聚焦，可传 `:focus-on-click="hit => hit.data.device?.id === 'ESS-001'"` |
 | 在列表点击设备，让 3D 跟过去 | `selectDevice(deviceId)` 同步选中，`await focusDevice(deviceId)` 移动镜头。大屏监听 `selection-change` 同步高亮，点空白收到 null。多物体绑定同一设备时，设备方法命中首个可解析绑定；要定位指定箱子，用 `selectTarget` 和 `focusTarget({type: 'asset-instance', instanceId: nodeId})`，两者传相同 target |
 | 持续刷新侧栏或图表 | 保存 `getRuntimeState()` 的返回值，在 Vue 模板或 computed 中读 `getRuntimeValue(bindingId, variableKey)`。点击事件提供当时的快照；实时状态会随后更新。无值显示“—”，数值 0 和布尔 false 应正常显示 |
 | 展示或切换命名镜头 | 用 `loaded.bookmarks` 或 `getBookmarks()` 获取 `{id, name}[]`，显示 name，用 id 调 `await flyToBookmark(id)`。第二个参数是过渡秒数，传 0 立即切换。调用结果 false 表示未完成 |

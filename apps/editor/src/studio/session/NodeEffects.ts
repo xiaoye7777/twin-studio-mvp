@@ -23,7 +23,6 @@ export class NodeEffects {
     const node = this.session.node(nodeId)
     if (!node) return
     const effect = createEffect(kind, targetForNode(node))
-    if (kind === 'floating-label' || kind === 'icon-marker') effect.parameters.text = node.name
     this.session.edit('添加特效', draft => void (draft.effects ??= []).push(effect))
   }
 

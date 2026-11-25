@@ -4,7 +4,7 @@ import type { InteractionMetadata, InteractionTrigger } from '../domain/interact
  * 改这里要同步 packages/viewer/index.d.ts（手写的对外声明），pnpm type-check 会检查两者是否一致。
  *
  * 双向联动：
- *   场景 → 宿主  target-click：点击对象时相机聚焦过去，并带上这个对象的数据
+ *   场景 → 宿主  target-click：点击对象时选中并回传数据，默认保持镜头位置
  *   宿主 → 场景  focusTarget / focusDevice：让相机聚焦到某个对象；getObjectData：取某个对象的数据
  */
 import type { DeepReadonly } from 'vue'

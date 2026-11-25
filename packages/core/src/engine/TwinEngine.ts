@@ -26,14 +26,7 @@ import { Atmosphere } from './Atmosphere'
 import { type CameraView, CameraRig } from './CameraRig'
 import { InfiniteGrid } from './InfiniteGrid'
 import { ModelLoader } from './ModelLoader'
-import {
-  AdaptiveQuality,
-  guessQualityLevel,
-  type QualityLevel,
-  type QualityProfile,
-  qualityProfiles,
-  type QualitySetting,
-} from './quality'
+import { qualityProfiles, type QualityLevel, type QualitySetting } from './quality'
 import { layoutLabels } from '../runtime/scene/textSprite'
 import { type OutlineChannel, RenderPipeline } from './RenderPipeline'
 
@@ -60,8 +53,6 @@ export interface PickResult {
   distance: number
 }
 
-const LOWER: Record<QualityLevel, QualityLevel> = { high: 'medium', medium: 'low', low: 'low' }
-
 /**
  * The rendering engine shared by the Editor and the Viewer: one renderer, scene, camera rig and
  * post-processing chain per canvas. Business objects live under `content`; everything else (sky, ground,
@@ -86,13 +77,13 @@ export class TwinEngine {
   private readonly weatherFocus = new Vector3()
   private readonly pickables = new Set<Object3D>()
   private readonly frameListeners = new Set<(delta: number, elapsed: number) => void>()
-  private readonly adaptive: AdaptiveQuality
+  private fps = 60
+  private sampleFrames = 0
+  private sampleDuration = 0
   private readonly resizeObserver: ResizeObserver
   private grid: InfiniteGrid | null = null
   private axes: AxesHelper | null = null
-  private qualitySetting: QualitySetting
-  private profile: QualityProfile
-  private baseProfile: QualityLevel
+  private readonly profile = qualityProfiles.high
   private width = 1
   private height = 1
   private contentDirty = true
@@ -120,9 +111,6 @@ export class TwinEngine {
     this.renderer.info.autoReset = false
     this.renderer.shadowMap.type = PCFShadowMap
     this.raycaster.firstHitOnly = true
-    this.qualitySetting = options.quality ?? 'auto'
-    this.baseProfile = this.resolveLevel(this.qualitySetting)
-    this.profile = qualityProfiles[this.baseProfile]
     this.content.name = 'Content'
     this.overlay.name = 'Overlay'
     this.overlay.userData.editorInternal = true
@@ -132,10 +120,6 @@ export class TwinEngine {
     this.atmosphere = new Atmosphere(this.renderer, this.scene)
     this.loader = new ModelLoader({ renderer: this.renderer, dracoDecoderPath: options.dracoDecoderPath })
     this.pipeline = new RenderPipeline(this.renderer, this.scene, this.camera, this.profile)
-    this.adaptive = new AdaptiveQuality(({ scale, stepDown }) => {
-      if (stepDown && this.profile.level !== 'low') this.applyProfile(LOWER[this.profile.level])
-      else this.resize(scale)
-    })
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(canvas)
     canvas.addEventListener('webglcontextlost', this.onContextLost)
@@ -320,22 +304,11 @@ export class TwinEngine {
     return () => this.frameListeners.delete(listener)
   }
 
-  get quality(): QualitySetting {
-    return this.qualitySetting
-  }
-
-  setQuality(setting: QualitySetting): void {
-    this.qualitySetting = setting
-    this.baseProfile = this.resolveLevel(setting)
-    this.adaptive.reset()
-    this.applyProfile(this.baseProfile)
-  }
-
   getStats(): EngineStats {
     return {
-      fps: Math.round(this.adaptive.fps),
+      fps: Math.round(this.fps),
       quality: this.profile.level,
-      setting: this.qualitySetting,
+      setting: 'high',
       pixelRatio: Math.round(this.renderer.getPixelRatio() * 100) / 100,
       drawCalls: this.lastInfo.calls,
       triangles: this.lastInfo.triangles,
@@ -387,27 +360,11 @@ export class TwinEngine {
     return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.86))
   }
 
-  private resolveLevel(setting: QualitySetting): QualityLevel {
-    if (setting !== 'auto') return setting
-    const gl = this.renderer.getContext()
-    const info = gl.getExtension('WEBGL_debug_renderer_info')
-    const gpu = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : ''
-    const pixels = this.canvas.clientWidth * this.canvas.clientHeight * Math.min(window.devicePixelRatio, 2) ** 2
-    return guessQualityLevel(gpu, navigator.hardwareConcurrency ?? 0, pixels)
-  }
-
-  private applyProfile(level: QualityLevel): void {
-    this.profile = qualityProfiles[level]
-    this.pipeline.setProfile(this.profile)
-    this.resize(this.adaptive.scale)
-    if (this.settings) void this.applySettings(this.settings, this.settingsOptions)
-  }
-
-  private resize(scale = this.adaptive.scale): void {
+  private resize(): void {
     if (this.disposed) return
     const width = Math.max(1, this.canvas.clientWidth)
     const height = Math.max(1, this.canvas.clientHeight)
-    const ratio = Math.min(window.devicePixelRatio || 1, this.profile.maxPixelRatio) * scale
+    const ratio = Math.min(window.devicePixelRatio || 1, this.profile.maxPixelRatio)
     this.width = width
     this.height = height
     this.renderer.setPixelRatio(Math.max(0.5, ratio))
@@ -425,12 +382,19 @@ export class TwinEngine {
   private readonly frame = (): void => {
     if (!this.running || this.contextLost || this.disposed) return
     const now = performance.now()
-    const delta = Math.min((now - this.lastFrame) / 1000, 0.1)
+    const frameSeconds = (now - this.lastFrame) / 1000
+    const delta = Math.min(frameSeconds, 0.1)
     this.lastFrame = now
     this.elapsed += delta
     if (this.canvas.clientWidth !== this.width || this.canvas.clientHeight !== this.height) this.resize()
     this.renderFrame(delta)
-    this.adaptive.sample(delta, this.qualitySetting === 'auto')
+    this.sampleFrames++
+    this.sampleDuration += frameSeconds
+    if (this.sampleDuration >= 1) {
+      this.fps = this.sampleFrames / this.sampleDuration
+      this.sampleFrames = 0
+      this.sampleDuration = 0
+    }
   }
 
   private renderFrame(delta: number): void {
@@ -463,7 +427,9 @@ export class TwinEngine {
   private readonly onContextRestored = (): void => {
     this.contextLost = false
     // Three re-uploads geometry and textures lazily; the composer's targets and passes are rebuilt here.
-    this.applyProfile(this.profile.level)
+    this.pipeline.setProfile(this.profile)
+    this.resize()
+    if (this.settings) void this.applySettings(this.settings, this.settingsOptions)
   }
 
   dispose(): void {

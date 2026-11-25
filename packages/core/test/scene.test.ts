@@ -1,3 +1,5 @@
+import { createEffect } from '../src/domain/effects'
+import { getBuiltinTemplates } from '../src/domain/effectTemplates/builtins'
 import { describe, expect, it } from 'vitest'
 import {
   createEmptyDocument,
@@ -45,6 +47,35 @@ function documentWith(...nodes: SceneNodeV2[]): SceneDocumentV2 {
 }
 
 describe('loadSceneDocument', () => {
+  it('opens old annotations without dropping scene objects, bindings or the remaining alarm effects', () => {
+    const doc = documentWith(model('a'))
+    const target = { type: 'asset-instance', instanceId: 'a' } as const
+    const beam = createEffect('beam', target)
+    const alarm = getBuiltinTemplates()[0]!
+    const old = { ...alarm.effects[0], id: 'annotation', kind: 'floating-label' }
+    const rule = {
+      id: 'rule',
+      enabled: true,
+      target,
+      bindingId: 'binding',
+      variableKey: 'temperature',
+      condition: { dataType: 'number', operator: '>', value: 60 },
+      priority: 10,
+    }
+    const loaded = loadSceneDocument({
+      ...doc,
+      effects: [beam, { ...beam, id: 'text', kind: 'data-label' }],
+      visualRules: [
+        { ...rule, template: { ...alarm, effects: [...alarm.effects, old] } },
+        { ...rule, id: 'only-icon', template: { ...alarm, effects: [{ ...old, kind: 'icon-marker' }] } },
+      ],
+    }).document
+    expect(loaded.effects).toEqual([beam])
+    expect(loaded.visualRules![0]?.template).toEqual(alarm)
+    expect(loaded.visualRules![1]?.template).toBeNull()
+    expect(loaded.nodes).toEqual(doc.nodes)
+  })
+
   it('reads what it writes', () => {
     const document = documentWith(model('a'))
     expect(loadSceneDocument(JSON.parse(JSON.stringify(document))).document).toEqual(document)

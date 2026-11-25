@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { loadSceneDocument } from '../src/domain/scene'
+import { createEffect } from '../src/domain/effects'
 import { targetForNode, targetNodeId } from '../src/domain/twin'
 import { duplicateNodes, removeNodes } from '../src/document/sceneOps'
 
@@ -28,7 +29,9 @@ describe.each(['cartoon', 'detailed'])('%s campus', style => {
       const binding = document.bindings.find(b => b.id === rule.bindingId)
       expect(binding?.variables.some(v => v.key === rule.variableKey)).toBe(true)
     }
-    const effect = document.effects![0]!
+    // An example can use alarms without permanent effects. Verify edits on a real bound device.
+    const effect = createEffect('beam', document.bindings[0]!.target)
+    ;(document.effects ??= []).push(effect)
     const source = targetNodeId(effect.target)
     expect(ids.has(source)).toBe(true)
     const [copy] = duplicateNodes(document, [source], [1, 0, 0])

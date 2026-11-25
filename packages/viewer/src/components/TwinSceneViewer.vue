@@ -27,7 +27,7 @@ const props = withDefaults(
     /** 资源 ID → 文件地址（也可以直接给 Blob）。 */
     resolveAsset?: AssetResolver
     assetApi?: ViewerAssetApi
-    /** 画质；auto 按设备和屏幕自适应。 */
+    /** 兼容旧调用；场景固定高清。 */
     quality?: ViewerQuality
     focusOnClick?: ViewerClickFocus
     /** 显示场景里的信息面板；宿主有自己的界面时可以关掉。 */
@@ -36,8 +36,8 @@ const props = withDefaults(
     dataRequestHeaders?: TwinSceneRuntimeOptions['dataRequestHeaders']
   }>(),
   {
-    quality: 'auto',
-    focusOnClick: true,
+    quality: 'high',
+    focusOnClick: false,
     panels: true,
     dataRequestHeaders: undefined,
     resolveAsset: undefined,
@@ -112,7 +112,6 @@ async function load(): Promise<void> {
         })
       },
       {
-        quality: props.quality,
         shouldFocusOnClick: event =>
           typeof props.focusOnClick === 'function' ? props.focusOnClick(event) : props.focusOnClick,
         onInteractionEvent: event => {
@@ -157,10 +156,6 @@ watch(
   () => {
     if (mounted) void load()
   },
-)
-watch(
-  () => props.quality,
-  quality => session.value?.setQuality(quality),
 )
 watch(
   () => props.panels,

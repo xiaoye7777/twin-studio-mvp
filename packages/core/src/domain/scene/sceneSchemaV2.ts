@@ -25,10 +25,25 @@ const nodeBase = {
   locked: z.boolean(),
 }
 
+const hexColor = z.string().regex(/^#[0-9a-f]{6}$/i, { message: '颜色必须是 #RRGGBB 格式' })
+
+export const ModelMaterialSchema = z.object({
+  /** Base colour; multiplies the texture unless `texture` is false. */
+  color: hexColor.optional(),
+  /** false removes the base colour texture, so `color` shows as is. */
+  texture: z.boolean().optional(),
+  opacity: z.number().min(0).max(1).optional(),
+  metalness: z.number().min(0).max(1).optional(),
+  roughness: z.number().min(0).max(1).optional(),
+  emissive: hexColor.optional(),
+  emissiveIntensity: z.number().min(0).max(20).optional(),
+})
+export type ModelMaterial = z.infer<typeof ModelMaterialSchema>
+
 export const ModelNodeSchemaV2 = z.object({
   ...nodeBase,
   kind: z.literal('model'),
-  model: z.object({ assetId: z.string() }),
+  model: z.object({ assetId: z.string(), material: ModelMaterialSchema.optional() }),
 })
 
 export const GroupNodeSchemaV2 = z.object({ ...nodeBase, kind: z.literal('group') })
@@ -46,8 +61,6 @@ export const PanelNodeSchemaV2 = z.object({
   kind: z.literal('panel'),
   panel: PanelInstanceSchema,
 })
-
-const hexColor = z.string().regex(/^#[0-9a-f]{6}$/i, { message: '颜色必须是 #RRGGBB 格式' })
 
 export const PrimitiveShapeSchema = z.enum(['box', 'plane', 'cylinder', 'sphere', 'cone'])
 

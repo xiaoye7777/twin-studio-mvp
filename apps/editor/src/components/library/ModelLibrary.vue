@@ -135,7 +135,7 @@ h1 {
 .dock {
   max-width: none;
   flex: none;
-  height: 148px;
+  height: 100%;
   border-top: 1px solid var(--s-line);
 }
 .dock-title {
@@ -144,11 +144,14 @@ h1 {
   font-weight: 600;
 }
 .dock .models {
-  display: flex;
+  grid-template-columns: repeat(auto-fill, minmax(min(128px, 100%), 1fr));
+  grid-auto-rows: 96px;
+  align-content: start;
   min-height: 0;
   flex: 1;
   gap: 8px;
   padding: 7px 10px;
-  overflow-x: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 </style>

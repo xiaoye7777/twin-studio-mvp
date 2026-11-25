@@ -42,3 +42,5 @@ export type {
   SceneTransform,
   Vector3Tuple,
 } from './sceneTypes'
+
+export type { ModelMaterial } from './sceneSchemaV2'

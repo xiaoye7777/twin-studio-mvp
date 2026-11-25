@@ -63,12 +63,6 @@ function set<K extends keyof EffectInstance['parameters']>(
   )
 }
 
-function toggleVariable(effect: EffectInstance, key: string): void {
-  const current = effect.parameters.variables ?? []
-  const next = current.includes(key) ? current.filter(item => item !== key) : [...current, key]
-  session.effects.updateEffect(effect.id, target => void (target.parameters.variables = next.length ? next : undefined))
-}
-
 function setCondition(
   rule: VisualRule,
   patch: Partial<{ variableKey: string; operator: string; value: string }>,
@@ -188,35 +182,6 @@ const operators = ['>', '>=', '<', '<=', '==', '!='] as const
                 @update="set(effect, 'height', $event)"
                 @commit="session.commit()"
               />
-            </UiRow>
-            <UiRow v-else-if="field === 'scale'" label="大小">
-              <UiSlider
-                :model-value="effect.parameters.scale ?? 1"
-                :min="0.3"
-                :max="4"
-                :step="0.05"
-                @update="set(effect, 'scale', $event)"
-                @commit="session.commit()"
-              />
-            </UiRow>
-            <UiRow v-else-if="field === 'text'" :label="effect.kind === 'data-label' ? '标题' : '文字'">
-              <UiText
-                :model-value="effect.parameters.text"
-                :placeholder="effect.kind === 'data-label' ? '默认为设备名称' : ''"
-                @commit="session.effects.updateEffect(effect.id, target => void (target.parameters.text = $event))"
-              />
-            </UiRow>
-            <UiRow v-else-if="field === 'variables'" label="显示变量" stack>
-              <div v-if="binding" class="fx__vars">
-                <label v-for="variable in binding.variables" :key="variable.key" class="fx__var">
-                  <input
-                    type="checkbox"
-                    :checked="!effect.parameters.variables || effect.parameters.variables.includes(variable.key)"
-                    @change="toggleVariable(effect, variable.key)"
-                  />{{ variable.name || variable.key }}
-                </label>
-              </div>
-              <span v-else class="s-hint">先在「数据」页签绑定设备，标牌会显示其实时数据</span>
             </UiRow>
           </template>
           <p v-if="effect.kind === 'outline'" class="fx__note s-hint">描边没有参数，颜色随主题统一。</p>
@@ -399,18 +364,6 @@ const operators = ['>', '>=', '<', '<=', '==', '!='] as const
 }
 .fx__body :deep(.ui-row) {
   padding: 2px 10px;
-}
-.fx__vars {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-}
-.fx__var {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--s-fg-2);
-  font-size: 11px;
 }
 .fx__note {
   margin: 0;

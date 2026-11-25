@@ -19,11 +19,11 @@ function preset(id: string, name: string, kinds: EffectKind[], color: string, ca
 }
 export function getBuiltinTemplates(): EffectTemplate[] {
   return [
-    preset('critical', '严重告警', ['box-glow', 'ripple', 'outline', 'floating-label'], '#ff3030', '告警'),
-    preset('warning', '高温预警', ['box-glow', 'floating-label'], '#ff9900', '告警'),
-    preset('offline', '设备离线', ['box-glow', 'floating-label'], '#8a8f98', '状态'),
+    preset('critical', '严重告警', ['box-glow', 'ripple', 'outline'], '#ff3030', '告警'),
+    preset('warning', '高温预警', ['box-glow'], '#ff9900', '告警'),
+    preset('offline', '设备离线', ['box-glow'], '#8a8f98', '状态'),
     preset('running', '运行中', ['beam'], '#3ad18a', '状态'),
-    preset('attention', '重点关注', ['icon-marker', 'outline'], '#ffb020', '高亮'),
+    preset('attention', '重点关注', ['outline'], '#ffb020', '高亮'),
     preset('selected', '设备选中', ['outline'], '#ffb020', '高亮'),
   ]
 }

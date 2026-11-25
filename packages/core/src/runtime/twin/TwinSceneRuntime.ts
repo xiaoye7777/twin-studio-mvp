@@ -71,7 +71,7 @@ export class TwinSceneRuntime {
     private readonly onClick: (event: ViewerTargetClick) => void,
     private readonly options: TwinSceneRuntimeOptions = {},
   ) {
-    this.engine = new TwinEngine(canvas, { quality: options.quality ?? 'auto' })
+    this.engine = new TwinEngine(canvas)
     this.sync = new SceneSync(this.engine, assets)
     this.resolver = new BindingTargetResolver(id => this.sync.objectFor(id))
     this.data = new TwinDataRuntime(this.twin, this.resolver, { requestHeaders: options.dataRequestHeaders })
@@ -139,7 +139,7 @@ export class TwinSceneRuntime {
       bindingId: data.bindingId ?? undefined,
       data,
     }
-    if (autoFocus && (this.options.shouldFocusOnClick?.(event) ?? true)) void this.focusTarget(hit.target)
+    if (autoFocus && (this.options.shouldFocusOnClick?.(event) ?? false)) void this.focusTarget(hit.target)
     this.onClick(event)
   }
 
@@ -252,10 +252,6 @@ export class TwinSceneRuntime {
   resetView(duration = 1): Promise<boolean> {
     const view = this.document?.cameraView
     return view ? this.engine.flyTo(view, duration) : this.engine.fitAll(duration)
-  }
-
-  setQuality(quality: ViewerQuality): void {
-    this.engine.setQuality(quality)
   }
 
   setPanelsEnabled(enabled: boolean): void {

@@ -142,7 +142,7 @@ const hourLabel = computed(() => {
           @commit="commit"
         />
       </UiRow>
-      <UiRow label="阴影" hint="低画质设备会自动关闭">
+      <UiRow label="阴影">
         <UiSwitch
           :model-value="settings.lighting.shadows"
           @update:model-value="session.updateSettings(s => void (s.lighting.shadows = $event), '阴影')"

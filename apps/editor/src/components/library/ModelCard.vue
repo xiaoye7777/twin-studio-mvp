@@ -133,7 +133,7 @@ function drag(event: DragEvent): void {
   font-size: 11px;
 }
 .compact {
-  width: 140px;
+  width: auto;
   flex: none;
   cursor: grab;
 }

@@ -7,13 +7,10 @@ export const EffectKindSchema = z.enum([
   'ground-pulse',
   'outline',
   'child-highlight',
-  'floating-label',
   'fence',
   'radar',
   'ripple',
   'beam',
-  'data-label',
-  'icon-marker',
 ])
 
 export const EffectParametersSchema = z.object({
@@ -45,7 +42,7 @@ export type EffectInstance = z.infer<typeof EffectInstanceSchema>
 export interface EffectDefinition {
   kind: EffectKind
   name: string
-  category: '告警' | '高亮' | '标注' | '氛围'
+  category: '告警' | '高亮' | '氛围'
   fields: readonly (keyof EffectParameters)[]
   description: string
 }
@@ -100,27 +97,6 @@ export const effectDefinitions: readonly EffectDefinition[] = [
     fields: ['color', 'opacity'],
     description: '对象自身发光着色',
   },
-  {
-    kind: 'floating-label',
-    name: '悬浮标注',
-    category: '标注',
-    fields: ['color', 'opacity', 'padding', 'text', 'scale'],
-    description: '对象上方的文字标签',
-  },
-  {
-    kind: 'data-label',
-    name: '数据标牌',
-    category: '标注',
-    fields: ['color', 'opacity', 'padding', 'text', 'scale', 'variables'],
-    description: '显示绑定设备的实时数据',
-  },
-  {
-    kind: 'icon-marker',
-    name: '定位图标',
-    category: '标注',
-    fields: ['color', 'speed', 'text', 'scale', 'height'],
-    description: '浮动的定位标记',
-  },
 ]
 
 export function effectDefinition(kind: EffectKind): EffectDefinition {
@@ -132,8 +108,6 @@ export function createEffect(kind: EffectKind, target: TwinBindingTarget): Effec
   if (kind === 'beam') Object.assign(parameters, { color: '#4fc3ff', opacity: 0.75, height: 30 })
   if (kind === 'radar') Object.assign(parameters, { color: '#42e6a4', opacity: 0.6, padding: 4 })
   if (kind === 'ripple') Object.assign(parameters, { color: '#ff7a45', opacity: 0.8, padding: 2 })
-  if (kind === 'data-label') Object.assign(parameters, { color: '#7ee0ff', opacity: 0.92, text: '', scale: 1 })
-  if (kind === 'icon-marker') Object.assign(parameters, { color: '#ffb020', text: '', scale: 1, height: 2 })
   return { id: `effect_${crypto.randomUUID()}`, kind, target: { ...target }, parameters }
 }
 export function createEffectParameters(): EffectParameters {

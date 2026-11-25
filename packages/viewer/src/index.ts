@@ -2,6 +2,7 @@ export { default as TwinSceneViewer } from './components/TwinSceneViewer.vue'
 export { loadSceneDocument, SCENE_DOCUMENT_VERSION } from '@twin-studio/core'
 export type {
   AssetResolver,
+  ModelMaterial,
   EffectInstance,
   EffectKind,
   EffectParameters,

@@ -5,10 +5,9 @@
 import { Box3, Color, Group, Mesh, Vector3 } from 'three'
 import type { Material, Object3D } from 'three'
 import { cloneEffects, isEffectInstance, type EffectInstance } from '../../domain/effects'
-import type { TwinBindingTarget } from '../../domain/twin'
 import type { OutlineChannel } from '../../engine/RenderPipeline'
 import type { BindingTargetResolver } from '../twin/BindingTargetResolver'
-import { createEffectVisual, type EffectDataLines, type EffectVisual, sceneTime } from './effectVisuals'
+import { createEffectVisual, type EffectVisual, sceneTime } from './effectVisuals'
 
 /** What effects need from the engine. */
 export interface EffectHost {
@@ -49,14 +48,10 @@ export class EffectRuntime {
   private outlined: Object3D[] = []
   private stopFrame: (() => void) | null = null
   private disposed = false
-  private lastDataRefresh = 0
   readonly unresolved = new Set<string>()
   private readonly bounds = new Box3()
   private readonly size = new Vector3()
   private readonly center = new Vector3()
-  /** Supplies live device data for data labels. */
-  dataProvider: ((target: TwinBindingTarget, variables?: readonly string[]) => EffectDataLines | null) | null = null
-
   constructor(
     private readonly host: EffectHost,
     private readonly resolver: BindingTargetResolver,
@@ -126,7 +121,6 @@ export class EffectRuntime {
     this.outlined = outlined
     this.host.setOutlined('effect', outlined)
     this.applyHighlights(highlights)
-    this.lastDataRefresh = 0
     this.update()
     if (this.visuals.length && !this.stopFrame) {
       activeLoops += 1
@@ -205,11 +199,8 @@ export class EffectRuntime {
 
   private update(): void {
     const time = sceneTime()
-    // Device values change at most a few times a second; labels redraw only when their text changes.
-    const refreshData = time - this.lastDataRefresh > 0.25
-    if (refreshData) this.lastDataRefresh = time
     for (const entry of this.visuals) {
-      const { target, visual, instance } = entry
+      const { target, visual } = entry
       let visible = true
       for (let node: Object3D | null = target; node; node = node.parent) if (!node.visible) visible = false
       target.updateWorldMatrix(true, true)
@@ -218,12 +209,7 @@ export class EffectRuntime {
       if (!visual.object.visible) continue
       this.bounds.getSize(this.size).max(new Vector3(0.01, 0.01, 0.01))
       this.bounds.getCenter(this.center)
-      const data =
-        instance.kind === 'data-label' && refreshData && this.dataProvider
-          ? this.dataProvider(instance.target, instance.parameters.variables)
-          : null
-      if (instance.kind === 'data-label' && !refreshData) continue
-      visual.update({ bounds: this.bounds, size: this.size, center: this.center, time, data })
+      visual.update({ bounds: this.bounds, size: this.size, center: this.center, time })
     }
   }
 

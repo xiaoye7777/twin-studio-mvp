@@ -100,17 +100,7 @@ export interface EffectParameters {
   variables?: string[]
 }
 export type EffectKind =
-  | 'box-glow'
-  | 'ground-pulse'
-  | 'outline'
-  | 'child-highlight'
-  | 'floating-label'
-  | 'fence'
-  | 'radar'
-  | 'ripple'
-  | 'beam'
-  | 'data-label'
-  | 'icon-marker'
+  'box-glow' | 'ground-pulse' | 'outline' | 'child-highlight' | 'fence' | 'radar' | 'ripple' | 'beam'
 export interface EffectInstance {
   id: string
   kind: EffectKind
@@ -256,6 +246,16 @@ export interface CameraViewV2 {
   fov?: number
   aspect?: number
 }
+export interface ModelMaterial {
+  color?: string
+  texture?: boolean
+  opacity?: number
+  metalness?: number
+  roughness?: number
+  emissive?: string
+  emissiveIntensity?: number
+}
+
 export interface SurfacePattern {
   kind: string
   scale: number
@@ -271,7 +271,7 @@ interface SceneNodeBaseV2 {
 }
 export type SceneNodeV2 = SceneNodeBaseV2 &
   (
-    | { kind: 'model'; model: { assetId: string } }
+    | { kind: 'model'; model: { assetId: string; material?: ModelMaterial } }
     | {
         kind: 'primitive'
         primitive: {
@@ -399,7 +399,7 @@ export const TwinSceneViewer: DefineComponent<
     onTargetClick?: (event: ViewerTargetClick) => void
     onLoaded?: (info: ViewerLoadedEvent) => void
     onError?: (message: string) => void
-    /** Render quality; 'auto' adapts to the device and screen. */
+    /** Legacy quality preference; rendering is always high quality. */
     quality?: ViewerQuality
     /** Show the scene's info panels. Default true; hosts with their own UI can turn it off. */
     panels?: boolean

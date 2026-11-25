@@ -214,7 +214,6 @@ const menuSections = computed<MenuSections>(() => {
   return [
     [
       ...(one ? [{ label: '重命名', action: () => void startRename(one) }] : []),
-      { label: '聚焦', action: () => void session.focusSelection() },
       { label: '创建副本', action: () => session.nodes.duplicateSelection() },
       ...(one?.kind === 'panel-group'
         ? [{ label: '添加子元素', action: () => session.panels.startPlacing(one.id) }]

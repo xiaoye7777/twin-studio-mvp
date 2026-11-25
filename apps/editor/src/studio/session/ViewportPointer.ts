@@ -2,7 +2,7 @@ import { isLockedOrHidden } from '@twin-studio/core'
 import type { EditorSession } from '../EditorSession'
 
 /**
- * 三维视口里的鼠标（编辑模式）：单击选中，Shift / Ctrl 单击多选，双击聚焦，悬停描边，右键菜单；
+ * 三维视口里的鼠标（编辑模式）：单击选中，Shift / Ctrl 单击多选，悬停描边，右键菜单；
  * 正在放置面板时，单击就是放一个。拖动超过 4 像素算旋转相机，不算点击。
  */
 export class ViewportPointer {
@@ -15,7 +15,6 @@ export class ViewportPointer {
     canvas.addEventListener('pointermove', this.onPointerMove)
     canvas.addEventListener('pointerleave', this.onPointerLeave)
     window.addEventListener('pointerup', this.onPointerUp)
-    canvas.addEventListener('dblclick', this.onDoubleClick)
     canvas.addEventListener('contextmenu', this.onContextMenu)
   }
 
@@ -26,7 +25,6 @@ export class ViewportPointer {
     canvas.removeEventListener('pointermove', this.onPointerMove)
     canvas.removeEventListener('pointerleave', this.onPointerLeave)
     window.removeEventListener('pointerup', this.onPointerUp)
-    canvas.removeEventListener('dblclick', this.onDoubleClick)
     canvas.removeEventListener('contextmenu', this.onContextMenu)
   }
 
@@ -72,14 +70,6 @@ export class ViewportPointer {
 
   private readonly onContextMenu = (event: MouseEvent): void => {
     if (this.session.ui.mode === 'edit') event.preventDefault()
-  }
-
-  private readonly onDoubleClick = (event: MouseEvent): void => {
-    if (!this.editing || this.session.ui.placing) return
-    const id = this.pickNode(event.clientX, event.clientY)
-    if (!id) return
-    this.session.select([id])
-    void this.session.focusSelection()
   }
 
   private readonly onPointerMove = (event: PointerEvent): void => {

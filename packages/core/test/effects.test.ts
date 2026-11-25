@@ -5,7 +5,7 @@ import { patch, REMOVE } from './helpers'
 const parameters = { color: '#FFb020', opacity: 0.65, speed: 1, padding: 0.2, text: '设备标注' }
 const effect = {
   id: 'effect_1',
-  kind: 'floating-label',
+  kind: 'beam',
   target: { type: 'primitive', nodeId: 'n1' },
   parameters,
 }
@@ -41,7 +41,7 @@ describe('isEffectParameters', () => {
 
 describe('isEffectInstance', () => {
   it.each([
-    ['label effect', effect],
+    ['beam effect', effect],
     ['created effect', createEffect('box-glow', { type: 'asset-instance', instanceId: 'i1' })],
     ['every kind', { ...effect, kind: 'child-highlight' }],
     ['provenance', { ...effect, sourceTemplateId: 'builtin:critical' }],

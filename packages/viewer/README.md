@@ -1,4 +1,4 @@
-# @twin-studio/viewer 0.12.0
+# @twin-studio/viewer 0.13.0
 
 Vue 3 项目运行组件。支持 Node 20.16+ 和 pnpm 10.20.0；加载编辑器保存的场景 JSON，按资源 ID 取模型文件，恢复模型、设备绑定、实时数据、镜头和信息面板。
 
@@ -53,14 +53,14 @@ const assetApi = {
 | `scene` | 必填 | 场景 JSON：解析好的对象，或一个返回 JSON 的地址。换一份就重新加载 |
 | `asset-api` | MVP 同源接口 | 自动加载时的业务接口地址和请求头，类型为 `ViewerAssetApi` |
 | `resolve-asset` | 可选 | 资源 ID → 模型文件。返回地址（SDK 自己下载），或 `Blob`（需要带登录信息时宿主下载好再给），可以是异步函数 |
-| `focus-on-click` | `true` | 宿主控制点击聚焦。可传布尔值，或传入函数，按点击的设备 / 场景实例返回布尔值 |
-| `quality` | `auto` | 画质：`auto`、`low`、`medium`、`high` |
+| `focus-on-click` | `false` | 宿主控制点击聚焦。可传布尔值，或传入函数，按点击的设备 / 场景实例返回布尔值 |
+| `quality` | `high` | 固定高清渲染；兼容旧档位参数，运行时统一使用高清 |
 | `panels` | `true` | 显示场景里的信息面板；宿主有自己的界面时设为 `false` |
 | `data-request-headers` | 无 | HTTP 接口的认证请求头。Token 不进场景 JSON，由集成方提供 |
 
 ## 双向联动
 
-**场景 → 大屏**：点击对象时，Viewer 选中它，并发出带设备数据的 `target-click`。默认同时聚焦；关闭点击聚焦仍会选中并回传数据。
+**场景 → 大屏**：点击对象时，Viewer 选中它，并发出带设备数据的 `target-click`。默认保持镜头位置。大屏可按需调用聚焦 API。
 
 ```ts
 interface ViewerTargetClick {

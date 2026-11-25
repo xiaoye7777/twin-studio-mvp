@@ -8,6 +8,7 @@ import UiSection from '@/components/ui/UiSection.vue'
 import UiSwitch from '@/components/ui/UiSwitch.vue'
 import UiText from '@/components/ui/UiText.vue'
 import { useSession } from '@/studio/context'
+import ModelMaterial from './ModelMaterial.vue'
 import PanelInstanceFields from './PanelInstanceFields.vue'
 
 const props = defineProps<{ nodes: SceneNodeV2[] }>()
@@ -70,6 +71,7 @@ const rows = computed(() => allRows.filter(row => node.value?.kind !== 'panel' |
       </UiRow>
     </UiSection>
 
+    <ModelMaterial v-if="node?.kind === 'model'" :key="node.id" :node="node" />
     <PanelInstanceFields v-if="node?.kind === 'panel'" :key="node.id" :node="node" />
   </div>
 </template>

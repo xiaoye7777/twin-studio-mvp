@@ -41,8 +41,6 @@ export function useStudioShortcuts(session: ShallowRef<EditorSession | null>, on
         return run(() => s.setTool('rotate'))
       case 'r':
         return run(() => s.setTool('scale'))
-      case 'f':
-        return run(() => void s.focusSelection())
       case 'h':
         return run(() => s.nodes.toggleVisibilityOfSelection())
       case 'delete':
