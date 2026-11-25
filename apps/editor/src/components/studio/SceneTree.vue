@@ -6,6 +6,9 @@
 import {
   Box,
   ChevronRight,
+  Route,
+  Lightbulb,
+  Pentagon,
   Eye,
   EyeOff,
   Folder,
@@ -35,7 +38,17 @@ const menu = useContextMenu()
 const renameText = ref('')
 const renameInput = ref<HTMLInputElement[]>()
 
-const icons: Record<string, unknown> = { model: Box, group: Folder, 'panel-group': Tags, panel: Tag }
+const icons: Record<string, unknown> = {
+  model: Box,
+  primitive: Shapes,
+  path: Route,
+  area: Pentagon,
+  label: Tag,
+  light: Lightbulb,
+  group: Folder,
+  'panel-group': Tags,
+  panel: Tag,
+}
 
 interface NodeRow {
   key: string

@@ -69,7 +69,7 @@ export interface ViewerObjectValue {
 export interface ViewerObjectData {
   nodeId: string
   name: string
-  kind: 'model' | 'group' | 'panel-group' | 'panel'
+  kind: SceneNodeV2['kind']
   device: TwinDevice | null
   bindingId: string | null
   values: ViewerObjectValue[]
@@ -88,6 +88,61 @@ export type TwinSceneViewerEvents = {
   'selection-change': [selection: ViewerSelection]
   'interaction-event': [event: ViewerInteractionEvent]
   'target-click': [event: ViewerTargetClick]
+}
+export interface EffectParameters {
+  color: string
+  opacity: number
+  speed: number
+  padding: number
+  text: string
+  height?: number
+  scale?: number
+  variables?: string[]
+}
+export type EffectKind =
+  | 'box-glow'
+  | 'ground-pulse'
+  | 'outline'
+  | 'child-highlight'
+  | 'floating-label'
+  | 'fence'
+  | 'radar'
+  | 'ripple'
+  | 'beam'
+  | 'data-label'
+  | 'icon-marker'
+export interface EffectInstance {
+  id: string
+  kind: EffectKind
+  target: TwinBindingTarget
+  parameters: EffectParameters
+  sourceTemplateId?: string
+}
+export type RelativeEffectTarget =
+  { mode: 'current-target' } | { mode: 'root-instance' } | { mode: 'asset-node'; assetNodeId: string }
+export interface EffectTemplate {
+  version: 1
+  id: string
+  origin: 'builtin' | 'local'
+  name: string
+  description: string
+  category: string
+  effects: { id: string; kind: EffectKind; parameters: EffectParameters; target: RelativeEffectTarget }[]
+}
+export type RuleOperator = '>' | '>=' | '<' | '<=' | '==' | '!='
+export type RuleCondition =
+  | { dataType: 'number'; operator: RuleOperator; value: number }
+  | { dataType: 'boolean'; operator: '==' | '!='; value: boolean }
+  | { dataType: 'string'; operator: '==' | '!='; value: string }
+export interface VisualRule {
+  id: string
+  bindingId: string
+  target: TwinBindingTarget
+  variableKey: string
+  condition: RuleCondition
+  enabled: boolean
+  priority: number
+  template: EffectTemplate | null
 }
 export type InteractionTrigger = 'click' | 'double-click' | 'hover-enter' | 'hover-leave'
 export type InteractionMetadataValue =
@@ -201,6 +256,11 @@ export interface CameraViewV2 {
   fov?: number
   aspect?: number
 }
+export interface SurfacePattern {
+  kind: string
+  scale: number
+  color: string
+}
 interface SceneNodeBaseV2 {
   id: string
   parentId: string | null
@@ -212,7 +272,72 @@ interface SceneNodeBaseV2 {
 export type SceneNodeV2 = SceneNodeBaseV2 &
   (
     | { kind: 'model'; model: { assetId: string } }
+    | {
+        kind: 'primitive'
+        primitive: {
+          shape: 'box' | 'plane' | 'cylinder' | 'sphere' | 'cone'
+          color: string
+          width?: number
+          height?: number
+          depth?: number
+          radiusTop?: number
+          radiusBottom?: number
+          radialSegments?: number
+          opacity?: number
+          emissive?: number
+          metalness?: number
+          roughness?: number
+          /** Surface pattern (grid, tiles, stripes, lawn, asphalt, water). Since 0.5.0. */
+          pattern?: SurfacePattern
+        }
+      }
     | { kind: 'group' }
+    | {
+        kind: 'path'
+        path: {
+          points: Vector3Tuple[]
+          closed: boolean
+          style: 'flow' | 'tube' | 'line'
+          color: string
+          width: number
+          speed: number
+          opacity: number
+        }
+      }
+    | {
+        kind: 'area'
+        area: {
+          points: Vector3Tuple[]
+          color: string
+          opacity: number
+          wallHeight: number
+          label: string
+          /** Since 0.5.0. */
+          pattern?: SurfacePattern
+        }
+      }
+    | {
+        kind: 'label'
+        label: {
+          text: string
+          style: 'tag' | 'title' | 'pin'
+          color: string
+          background: string
+          size: number
+          leader: boolean
+        }
+      }
+    | {
+        kind: 'light'
+        light: {
+          type: 'point' | 'spot'
+          color: string
+          intensity: number
+          distance: number
+          angle: number
+          castShadow: boolean
+        }
+      }
     /** The parent of info panels; its template applies to all of them. */
     | { kind: 'panel-group'; template: PanelTemplate }
     /** An info panel placed in the scene, a child of a panel-group. */
@@ -256,6 +381,8 @@ export interface SceneDocumentV2 {
   cameraView?: CameraViewV2
   nodes: SceneNodeV2[]
   bindings: TwinBinding[]
+  effects?: EffectInstance[]
+  visualRules?: VisualRule[]
   interactions?: SceneInteraction[]
   bookmarks: CameraBookmark[]
 }

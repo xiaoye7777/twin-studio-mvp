@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /** 「3D场景」页面：场景卡片，新建、打开、改信息、删除。 */
 import { ElMessage } from 'element-plus'
-import { Box, Plus } from 'lucide-vue-next'
+import { Box, ChevronDown, Plus, Sparkles } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { ProjectInfo } from '@/api/adapter'
+import { campusExamples, createCampus } from '@/demo/createCampus'
+import UiDropdown from '@/components/ui/UiDropdown.vue'
 import ProjectCard from '@/components/project/ProjectCard.vue'
 import CoverDialog from '@/components/project/CoverDialog.vue'
 import ProjectDialog from '@/components/project/ProjectDialog.vue'
@@ -23,6 +25,28 @@ const dialogOpen = computed({
 })
 const submitting = ref(false)
 const coverProject = ref<ProjectInfo | null>(null)
+
+const generating = ref(false)
+const demoMenu = [
+  campusExamples.map(example => ({
+    label: example.name,
+    testid: `generate-${example.key}`,
+    action: async () => {
+      if (generating.value) return
+      generating.value = true
+      try {
+        const { project, coverSaved } = await createCampus(example)
+        if (!coverSaved) ElMessage.warning('园区已生成，示例封面上传失败。可在场景卡片中更改封面。')
+        await store.refresh()
+        open(project)
+      } catch (error) {
+        report(error, '生成园区失败')
+      } finally {
+        generating.value = false
+      }
+    },
+  })),
+]
 
 onMounted(() => void store.refresh())
 
@@ -66,9 +90,18 @@ async function remove(project: ProjectInfo): Promise<void> {
         <h1>3D场景</h1>
         <p>搭建三维场景，配置设备数据，交给数据大屏</p>
       </div>
-      <button class="s-btn s-btn--primary" data-testid="new-project" @click="dialog = { project: null }">
-        <Plus :size="14" />新建场景
-      </button>
+      <div class="projects__actions">
+        <UiDropdown :sections="demoMenu" align="end">
+          <template #default="{ toggle }">
+            <button class="s-btn" data-testid="generate-campus" :disabled="generating" @click="toggle">
+              <Sparkles :size="14" />{{ generating ? '正在生成…' : '生成案例' }}<ChevronDown :size="12" />
+            </button>
+          </template>
+        </UiDropdown>
+        <button class="s-btn s-btn--primary" data-testid="new-project" @click="dialog = { project: null }">
+          <Plus :size="14" />新建场景
+        </button>
+      </div>
     </header>
 
     <p v-if="store.error" class="projects__error">{{ store.error }}</p>
@@ -110,6 +143,10 @@ async function remove(project: ProjectInfo): Promise<void> {
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 24px;
+}
+.projects__actions {
+  display: flex;
+  gap: 8px;
 }
 .projects__head h1 {
   margin: 0;

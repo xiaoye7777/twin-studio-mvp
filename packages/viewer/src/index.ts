@@ -2,6 +2,15 @@ export { default as TwinSceneViewer } from './components/TwinSceneViewer.vue'
 export { loadSceneDocument, SCENE_DOCUMENT_VERSION } from '@twin-studio/core'
 export type {
   AssetResolver,
+  EffectInstance,
+  EffectKind,
+  EffectParameters,
+  EffectTemplate,
+  RelativeEffectTarget,
+  RuleOperator,
+  SurfacePatternV2 as SurfacePattern,
+  RuleCondition,
+  VisualRule,
   ViewerAssetApi,
   CameraBookmark,
   CameraViewV2,

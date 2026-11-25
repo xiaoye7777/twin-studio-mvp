@@ -5,7 +5,7 @@ export function createShellState() {
   return reactive({
     leftTab: 'scene' as 'scene' | 'cameras',
     /** 选中对象时右栏的页签。 */
-    nodeTab: 'properties' as 'properties' | 'data' | 'interactions',
+    nodeTab: 'properties' as 'properties' | 'data' | 'effects' | 'interactions',
     /** 什么都没选时右栏的页签。 */
     sceneTab: 'environment' as 'environment' | 'data',
     managingDeviceTypes: false,

@@ -4,6 +4,13 @@ import type {
   CameraBookmarkSchema,
   CameraViewSchemaV2,
   GroupNodeSchemaV2,
+  PrimitiveNodeSchemaV2,
+  PathNodeSchemaV2,
+  AreaNodeSchemaV2,
+  LabelNodeSchemaV2,
+  LightNodeSchemaV2,
+  PrimitiveShapeSchema,
+  SurfacePatternSchema,
   ModelNodeSchemaV2,
   PanelGroupNodeSchemaV2,
   PanelNodeSchemaV2,
@@ -21,3 +28,10 @@ export type PanelGroupNodeV2 = z.infer<typeof PanelGroupNodeSchemaV2>
 export type PanelNodeV2 = z.infer<typeof PanelNodeSchemaV2>
 export type CameraViewV2 = z.infer<typeof CameraViewSchemaV2>
 export type CameraBookmark = z.infer<typeof CameraBookmarkSchema>
+export type PrimitiveNodeV2 = z.infer<typeof PrimitiveNodeSchemaV2>
+export type PathNodeV2 = z.infer<typeof PathNodeSchemaV2>
+export type AreaNodeV2 = z.infer<typeof AreaNodeSchemaV2>
+export type LabelNodeV2 = z.infer<typeof LabelNodeSchemaV2>
+export type LightNodeV2 = z.infer<typeof LightNodeSchemaV2>
+export type PrimitiveShape = z.infer<typeof PrimitiveShapeSchema>
+export type SurfacePatternV2 = z.infer<typeof SurfacePatternSchema>

@@ -14,6 +14,11 @@ export function useSession(): EditorSession {
 export const nodeKindLabels: Record<string, string> = {
   model: '模型',
   group: '分组',
+  primitive: '基本体',
+  path: '路径',
+  area: '区域',
+  label: '标注',
+  light: '灯光',
   'panel-group': '标签组',
   panel: '信息面板',
 }

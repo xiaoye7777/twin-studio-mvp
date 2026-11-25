@@ -80,18 +80,18 @@ describe('loadSceneDocument', () => {
   it('opens documents written by a fuller editor, dropping what this version does not support', () => {
     const full = {
       ...documentWith(model('a')),
-      effects: [{ id: 'e' }],
+      effects: [],
       tours: [],
       dataSources: [{ id: 'old', name: '演示', type: 'mock', enabled: true }],
       nodes: [
         { ...model('a'), model: { assetId: 'asset_1', overrides: {}, deleted: [] } },
-        { ...model('b'), kind: 'label', label: { text: 'x' } },
+        { ...model('b'), kind: 'future-node' },
       ],
     }
     const { document, dropped } = loadSceneDocument(full)
     expect(document.nodes.map(node => node.id)).toEqual(['a'])
     expect(document.dataSources).toEqual([])
-    expect(document).not.toHaveProperty('effects')
+    expect(document.effects).toEqual([])
     expect(dropped).toHaveLength(1)
   })
 

@@ -34,6 +34,7 @@ import {
   qualityProfiles,
   type QualitySetting,
 } from './quality'
+import { layoutLabels } from '../runtime/scene/textSprite'
 import { type OutlineChannel, RenderPipeline } from './RenderPipeline'
 
 export interface TwinEngineOptions {
@@ -444,6 +445,7 @@ export class TwinEngine {
     this.atmosphere.update(delta, this.camera.position, this.rig.controls.getTarget(this.weatherFocus))
     for (const listener of this.frameListeners) listener(delta, elapsed)
     this.renderer.info.reset()
+    layoutLabels(this.scene, this.camera, this.width, this.height, delta)
     this.pipeline.render(delta)
     this.lastInfo = { calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles }
   }

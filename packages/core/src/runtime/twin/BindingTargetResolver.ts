@@ -3,14 +3,15 @@
  * 这里负责在场景里找到对应的三维对象，以及反过来从被点到的对象找出它代表的目标。
  */
 import type { Object3D } from 'three'
-import { targetNodeId, type TwinBindingTarget } from '../../domain/twin'
+import { targetForNode, targetNodeId, type TwinBindingTarget } from '../../domain/twin'
 import { findAssetInstanceRoot, getEditorMetadata } from '../scene/objectMetadata'
 
 /** The binding target an object stands for, or null for unidentified parts. */
 export function bindingTargetFromObject(object: Object3D): TwinBindingTarget | null {
   const nodeId: unknown = object.userData.sceneNodeId
   const kind: unknown = object.userData.nodeKind
-  if (typeof nodeId === 'string' && typeof kind === 'string' && kind !== 'model') return { type: 'node', nodeId }
+  if (typeof nodeId === 'string' && typeof kind === 'string' && kind !== 'model')
+    return targetForNode({ id: nodeId, kind })
   const assetRoot = findAssetInstanceRoot(object)
   const rootMetadata = assetRoot ? getEditorMetadata(assetRoot) : null
   if (!assetRoot || rootMetadata?.kind !== 'assetInstance') return null

@@ -8,6 +8,8 @@ import { z } from 'zod'
 import { ProjectDataSourcesSchema } from '../dataSources'
 import { PanelInstanceSchema, PanelTemplateSchema } from '../panels'
 import { nonEmptyString, uniqueBy } from '../schemaHelpers'
+import { EffectInstanceSchema } from '../effects'
+import { VisualRuleSchema } from '../visualRules'
 import { SceneInteractionSchema } from '../interactions'
 import { DeviceTemplatesSchema, TwinBindingSchema } from '../twin'
 import { SceneTransformSchema, Vector3TupleSchema } from './sceneSchema'
@@ -45,14 +47,129 @@ export const PanelNodeSchemaV2 = z.object({
   panel: PanelInstanceSchema,
 })
 
+const hexColor = z.string().regex(/^#[0-9a-f]{6}$/i, { message: '颜色必须是 #RRGGBB 格式' })
+
+export const PrimitiveShapeSchema = z.enum(['box', 'plane', 'cylinder', 'sphere', 'cone'])
+
+/** A pattern drawn on a surface (tech grid, floor tiles, lawn…), repeating every `scale` metres. */
+export const SurfacePatternSchema = z.object({
+  /** grid | tiles | stripes | lawn | asphalt | water. Kinds a viewer does not know render plain. */
+  kind: z.string().min(1).max(40),
+  scale: z.number().min(0.1).max(200),
+  /** Lines, grout or highlights. */
+  color: hexColor,
+})
+
+export const PrimitiveNodeSchemaV2 = z.object({
+  ...nodeBase,
+  kind: z.literal('primitive'),
+  primitive: z.object({
+    shape: PrimitiveShapeSchema,
+    color: z.string(),
+    width: z.number().optional(),
+    height: z.number().optional(),
+    depth: z.number().optional(),
+    radiusTop: z.number().optional(),
+    radiusBottom: z.number().optional(),
+    radialSegments: z.number().optional(),
+    /** 0–1; below 1 the surface is see-through. */
+    opacity: z.number().min(0).max(1).optional(),
+    /** 0–1 glow of the surface colour (shows best at night with bloom). */
+    emissive: z.number().min(0).max(1).optional(),
+    metalness: z.number().min(0).max(1).optional(),
+    roughness: z.number().min(0).max(1).optional(),
+    pattern: SurfacePatternSchema.optional(),
+  }),
+})
+
+/** A polyline in the node's local space, drawn on the ground: pipes, cables, energy flow, routes. */
+export const PathNodeSchemaV2 = z.object({
+  ...nodeBase,
+  kind: z.literal('path'),
+  path: z.object({
+    points: z.array(Vector3TupleSchema).min(2).max(500),
+    closed: z.boolean(),
+    style: z.enum(['flow', 'tube', 'line']),
+    color: hexColor,
+    /** Metres. */
+    width: z.number().min(0.02).max(50),
+    /** Flow speed; 0 is static. Negative reverses the direction. */
+    speed: z.number().min(-20).max(20),
+    opacity: z.number().min(0).max(1),
+  }),
+})
+
+/** A polygon zone on the ground: plots, functional areas, restricted zones. */
+export const AreaNodeSchemaV2 = z.object({
+  ...nodeBase,
+  kind: z.literal('area'),
+  area: z.object({
+    points: z.array(Vector3TupleSchema).min(3).max(500),
+    color: hexColor,
+    opacity: z.number().min(0).max(1),
+    /** Height of the glowing border wall in metres; 0 draws only the outline. */
+    wallHeight: z.number().min(0).max(200),
+    /** Optional caption shown at the centre. */
+    label: z.string().max(80),
+    /** Turns the translucent zone into a surface: lawn, paving, water… */
+    pattern: SurfacePatternSchema.optional(),
+  }),
+})
+
+/** A text label anchored in the scene (always faces the camera). */
+export const LabelNodeSchemaV2 = z.object({
+  ...nodeBase,
+  kind: z.literal('label'),
+  label: z.object({
+    text: z.string().max(200),
+    style: z.enum(['tag', 'title', 'pin']),
+    color: hexColor,
+    background: hexColor,
+    /** Size multiplier. */
+    size: z.number().min(0.2).max(10),
+    /** Draws a leader line down to the ground. */
+    leader: z.boolean(),
+  }),
+})
+
+export const LightNodeSchemaV2 = z.object({
+  ...nodeBase,
+  kind: z.literal('light'),
+  light: z.object({
+    type: z.enum(['point', 'spot']),
+    color: hexColor,
+    intensity: z.number().min(0).max(1000),
+    /** Metres; 0 is unlimited. */
+    distance: z.number().min(0).max(5000),
+    /** Spot lights: cone angle in degrees. */
+    angle: z.number().min(1).max(89),
+    castShadow: z.boolean(),
+  }),
+})
+
 export const SceneNodeSchemaV2 = z.discriminatedUnion('kind', [
   ModelNodeSchemaV2,
   GroupNodeSchemaV2,
   PanelGroupNodeSchemaV2,
   PanelNodeSchemaV2,
+  PrimitiveNodeSchemaV2,
+  PathNodeSchemaV2,
+  AreaNodeSchemaV2,
+  LabelNodeSchemaV2,
+  LightNodeSchemaV2,
 ])
 
-export const SCENE_NODE_KINDS: readonly string[] = ['model', 'group', 'panel-group', 'panel']
+export const SCENE_NODE_KINDS: readonly string[] = [
+  'model',
+  'group',
+  'panel-group',
+  'panel',
+  'primitive',
+  'path',
+  'area',
+  'label',
+  'light',
+]
 
 /** 什么节点能放在什么节点下面：面板只能在标签组里，标签组里也只能有面板。parentKind 是 null 表示顶层。 */
 export function canParent(parentKind: string | null, childKind: string): boolean {
@@ -134,6 +251,14 @@ export const SceneDocumentSchemaV2 = z.object({
   bindings: z.array(TwinBindingSchema),
   /** 缺省时编辑器提供内置类型；空数组表示已全部删除。 */
   deviceTemplates: DeviceTemplatesSchema.optional(),
+  effects: z
+    .array(EffectInstanceSchema)
+    .superRefine(uniqueBy(item => item.id, '特效 ID'))
+    .optional(),
+  visualRules: z
+    .array(VisualRuleSchema)
+    .superRefine(uniqueBy(item => item.id, '规则 ID'))
+    .optional(),
   interactions: z
     .array(SceneInteractionSchema)
     .superRefine(uniqueBy(item => item.id, '交互 ID'))

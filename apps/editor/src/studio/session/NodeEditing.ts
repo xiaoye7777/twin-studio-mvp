@@ -2,6 +2,8 @@ import { Box3, Matrix4, Vector3 } from 'three'
 import {
   canParent,
   copyInteractions,
+  copyEffects,
+  type EffectInstance,
   type SceneInteraction,
   targetNodeId,
   duplicateNodes,
@@ -29,7 +31,12 @@ import type { EditorSession } from '../EditorSession'
  */
 export class NodeEditing {
   /** 复制的节点，以及它们的中心（「粘贴到这里」要用）。 */
-  private clipboard: { nodes: SceneNodeV2[]; interactions: SceneInteraction[]; center: Vector3 | null } | null = null
+  private clipboard: {
+    nodes: SceneNodeV2[]
+    effects: EffectInstance[]
+    interactions: SceneInteraction[]
+    center: Vector3 | null
+  } | null = null
   private readonly collapsedScales = new Map<string, SceneTransform['scale']>()
 
   constructor(private readonly session: EditorSession) {}
@@ -175,6 +182,7 @@ export class NodeEditing {
     }
     this.clipboard = {
       nodes: plain(doc.nodes.filter(node => included.has(node.id))),
+      effects: plain((doc.effects ?? []).filter(effect => included.has(targetNodeId(effect.target)))),
       interactions: plain((doc.interactions ?? []).filter(rule => included.has(targetNodeId(rule.source)))),
       center: bounds.isEmpty() ? null : bounds.getCenter(new Vector3()),
     }
@@ -216,6 +224,7 @@ export class NodeEditing {
           node.panel.targetNodeId = remap.get(node.panel.targetNodeId) ?? node.panel.targetNodeId
         draft.nodes.push(node)
       }
+      if (clip.effects.length) (draft.effects ??= []).push(...copyEffects(clip.effects, remap))
       if (clip.interactions.length) (draft.interactions ??= []).push(...copyInteractions(clip.interactions, remap))
     })
     this.session.select(roots)

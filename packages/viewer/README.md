@@ -1,4 +1,4 @@
-# @twin-studio/viewer 0.11.0
+# @twin-studio/viewer 0.12.0
 
 Vue 3 项目运行组件。支持 Node 20.16+ 和 pnpm 10.20.0；加载编辑器保存的场景 JSON，按资源 ID 取模型文件，恢复模型、设备绑定、实时数据、镜头和信息面板。
 

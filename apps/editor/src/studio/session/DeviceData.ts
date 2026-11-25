@@ -146,6 +146,7 @@ export class DeviceData {
     if (!binding) return
     this.session.edit('解除绑定', draft => {
       draft.bindings = draft.bindings.filter(item => item.id !== binding.id)
+      if (draft.visualRules) draft.visualRules = draft.visualRules.filter(rule => rule.bindingId !== binding.id)
     })
   }
 

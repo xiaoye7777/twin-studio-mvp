@@ -32,6 +32,7 @@ import { bindingTargetFromObject, BindingTargetResolver } from './BindingTargetR
 import { createTwinState } from './createTwinState'
 import { readObjectData } from './readObjectData'
 import { TwinDataRuntime, type TwinDataRuntimeOptions } from './TwinDataRuntime'
+import { SceneEffects } from '../effects/sceneEffects'
 import { InteractionRuntime } from '../interactions/InteractionRuntime'
 
 export interface TwinSceneRuntimeOptions {
@@ -58,6 +59,7 @@ export class TwinSceneRuntime {
   private readonly resolver: BindingTargetResolver
   private readonly data: TwinDataRuntime
   private readonly panels: PanelLayer
+  private effects: SceneEffects | null = null
   private interactions: InteractionRuntime | null = null
   private disposed = false
   private started = false
@@ -90,6 +92,7 @@ export class TwinSceneRuntime {
       this.panels.setDocument(document)
       if (!document.cameraView) await this.engine.fitAll(0)
       this.data.initialize(document.projectId, document.bindings)
+      this.effects = new SceneEffects(this.engine, this.twin, this.resolver, () => document)
       this.data.start(document.dataSources)
       this.interactions = new InteractionRuntime(
         this.canvas,
@@ -265,6 +268,7 @@ export class TwinSceneRuntime {
     this.selection = null
     this.interactions?.dispose()
     this.interactions = null
+    this.effects?.dispose()
     this.panels.dispose()
     this.data.stop()
     this.sync.dispose()

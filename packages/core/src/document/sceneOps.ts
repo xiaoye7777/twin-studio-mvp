@@ -11,6 +11,7 @@ import {
   type SceneNodeV2,
   type SceneTransform,
 } from '../domain/scene'
+import type { EffectInstance } from '../domain/effects'
 import type { SceneInteraction } from '../domain/interactions'
 import { targetNodeId, type TwinBindingTarget } from '../domain/twin'
 
@@ -139,6 +140,8 @@ export function removeNodes(draft: Doc, ids: readonly string[]): Set<string> {
   for (const id of ids) for (const nodeId of subtreeIds(draft, id)) removed.add(nodeId)
   draft.nodes = draft.nodes.filter(node => !removed.has(node.id))
   draft.bindings = draft.bindings.filter(binding => !removed.has(targetNodeId(binding.target)))
+  if (draft.effects) draft.effects = draft.effects.filter(effect => !removed.has(targetNodeId(effect.target)))
+  if (draft.visualRules) draft.visualRules = draft.visualRules.filter(rule => !removed.has(targetNodeId(rule.target)))
   if (draft.interactions)
     draft.interactions = draft.interactions.filter(
       rule =>
@@ -187,8 +190,21 @@ export function duplicateNodes(draft: Doc, ids: readonly string[], offset: [numb
     const target = copy?.kind === 'panel' ? copy.panel.targetNodeId : undefined
     if (copy?.kind === 'panel' && target && remap.has(target)) copy.panel.targetNodeId = remap.get(target)!
   }
+  if (draft.effects?.length) draft.effects.push(...copyEffects(draft.effects, remap))
   if (draft.interactions?.length) draft.interactions.push(...copyInteractions(draft.interactions, remap))
   return created
+}
+
+export function copyEffects(effects: readonly EffectInstance[], remap: ReadonlyMap<string, string>): EffectInstance[] {
+  return effects.flatMap(effect => {
+    const id = remap.get(targetNodeId(effect.target))
+    if (!id) return []
+    const copy = plain(effect)
+    copy.id = newId('effect')
+    if ('instanceId' in copy.target) copy.target.instanceId = id
+    else copy.target.nodeId = id
+    return [copy]
+  })
 }
 
 /** 源对象随副本复制，指向同一批副本的目标也要重映射；外部目标保留原引用。 */

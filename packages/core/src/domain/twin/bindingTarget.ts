@@ -18,6 +18,7 @@ export function targetNodeId(target: TwinBindingTarget): string {
 /** The canonical target for a whole scene node, as bindings write it. */
 export function targetForNode(node: { id: string; kind: string }): TwinBindingTarget {
   if (node.kind === 'model') return { type: 'asset-instance', instanceId: node.id }
+  if (node.kind === 'primitive') return { type: 'primitive', nodeId: node.id }
   return { type: 'node', nodeId: node.id }
 }
 

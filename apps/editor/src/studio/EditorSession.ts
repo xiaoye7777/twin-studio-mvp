@@ -25,12 +25,14 @@ import {
   TwinDataRuntime,
   TwinEngine,
   InteractionRuntime,
+  SceneEffects,
   worldMatrixOf,
 } from '@twin-studio/core'
 import type { SceneConflict } from '@/api/adapter'
 import { SceneConflictError } from '@/api/repositories'
 import { CameraViews } from './session/CameraViews'
 import { DeviceData } from './session/DeviceData'
+import { NodeEffects } from './session/NodeEffects'
 import { NodeEditing } from './session/NodeEditing'
 import { PanelManager } from './session/PanelManager'
 import { ViewportPointer } from './session/ViewportPointer'
@@ -103,6 +105,8 @@ export class EditorSession {
     placing: null as string | null,
   })
 
+  readonly effects = new NodeEffects(this)
+  private readonly sceneEffects: SceneEffects
   readonly nodes = new NodeEditing(this)
   readonly cameras = new CameraViews(this)
   readonly devices = new DeviceData(this)
@@ -132,6 +136,13 @@ export class EditorSession {
     this.sync = new SceneSync(this.engine, this.assets, undefined, { editor: true })
     this.store = new DocumentStore(createEmptyDocument(deps.projectId, deps.projectName), 300)
     this.resolver = new BindingTargetResolver(id => this.sync.objectFor(id))
+    this.sceneEffects = new SceneEffects(
+      this.engine,
+      this.twin,
+      this.resolver,
+      () => this.doc.value,
+      () => this.ui.syncRevision,
+    )
     this.dataRuntime = new TwinDataRuntime(this.twin, this.resolver)
     let dragStart: SceneDocumentV2 | null = null
     this.gizmo = new TransformGizmo(this.engine, {
@@ -179,6 +190,7 @@ export class EditorSession {
     this.disposed = true
     this.pointer.dispose()
     this.exitPreview()
+    this.sceneEffects.dispose()
     this.panelLayer.dispose()
     this.dataRuntime.stop()
     this.gizmo.dispose()

@@ -1,0 +1,110 @@
+{
+  "energy-storage-container.glb": {
+    "path": "models/energy-storage-container.glb",
+    "title": "储能集装箱"
+  },
+  "solar-array.glb": {
+    "path": "models/solar-array.glb",
+    "title": "光伏阵列"
+  },
+  "wind-turbine.glb": {
+    "path": "models/wind-turbine.glb",
+    "title": "风力发电机"
+  },
+  "energy-center.glb": {
+    "path": "models/energy-center.glb",
+    "title": "综合能源站"
+  },
+  "thermal-storage-tank.glb": {
+    "path": "models/thermal-storage-tank.glb",
+    "title": "储热罐"
+  },
+  "office-tower.glb": {
+    "path": "models/office-tower.glb",
+    "title": "办公楼"
+  },
+  "factory.glb": {
+    "path": "models/factory.glb",
+    "title": "制造车间"
+  },
+  "warehouse.glb": {
+    "path": "models/warehouse.glb",
+    "title": "仓储中心"
+  },
+  "ess-cabinet-lite.glb": {
+    "path": "campuses/models/ess-cabinet-lite.glb",
+    "title": "储能柜（轻量）"
+  },
+  "ess-cabinet.glb": {
+    "path": "campuses/models/ess-cabinet.glb",
+    "title": "储能柜（可拆解）"
+  },
+  "cable-tray.glb": {
+    "path": "campuses/models/cable-tray.glb",
+    "title": "电缆桥架"
+  },
+  "box-transformer.glb": {
+    "path": "campuses/models/box-transformer.glb",
+    "title": "箱式变压器"
+  },
+  "main-transformer.glb": {
+    "path": "campuses/models/main-transformer.glb",
+    "title": "主变压器"
+  },
+  "hv-bay.glb": {
+    "path": "campuses/models/hv-bay.glb",
+    "title": "高压出线间隔"
+  },
+  "transmission-tower-a.glb": {
+    "path": "campuses/models/transmission-tower-a.glb",
+    "title": "输电铁塔 A"
+  },
+  "control-room.glb": {
+    "path": "campuses/models/control-room.glb",
+    "title": "站控室"
+  },
+  "switchgear-cabin.glb": {
+    "path": "campuses/models/switchgear-cabin.glb",
+    "title": "35kV 开关舱"
+  },
+  "pv-carport.glb": {
+    "path": "campuses/models/pv-carport.glb",
+    "title": "光伏车棚"
+  },
+  "ev-charger.glb": {
+    "path": "campuses/models/ev-charger.glb",
+    "title": "充电桩"
+  },
+  "covered-car.glb": {
+    "path": "campuses/models/covered-car.glb",
+    "title": "车衣轿车"
+  },
+  "station-fence-long.glb": {
+    "path": "campuses/models/station-fence-long.glb",
+    "title": "电站围栏（16 米）"
+  },
+  "station-fence.glb": {
+    "path": "campuses/models/station-fence.glb",
+    "title": "电站围栏"
+  },
+  "light-mast.glb": {
+    "path": "campuses/models/light-mast.glb",
+    "title": "高杆灯"
+  },
+  "boom-barrier.glb": {
+    "path": "campuses/models/boom-barrier.glb",
+    "title": "道闸"
+  },
+  "station-sign.glb": {
+    "path": "campuses/models/station-sign.glb",
+    "title": "电站标识"
+  },
+  "fire-hydrant.glb": {
+    "path": "campuses/models/fire-hydrant.glb",
+    "title": "消防栓"
+  },
+  "manhole-cover.glb": {
+    "path": "campuses/models/manhole-cover.glb",
+    "title": "井盖"
+  }
+}

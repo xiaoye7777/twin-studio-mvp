@@ -16,6 +16,14 @@ import { Group, type Object3D } from 'three'
 import { applySceneTransform, type SceneDocumentV2, type SceneNodeV2 } from '../../domain/scene'
 import type { AssetRepository } from '../../infrastructure/assets/AssetRepository'
 import type { TwinEngine } from '../../engine/TwinEngine'
+import {
+  createPrimitiveObject,
+  createPathObject,
+  createAreaObject,
+  createLabelObject,
+  createLightObject,
+  disposeOwned,
+} from './nodeObjects'
 import { PanelObject } from '../panels/PanelObject'
 import { ImportedAssetResourceRegistry } from './ImportedAssetResourceRegistry'
 import { setEditorMetadata } from './objectMetadata'
@@ -44,6 +52,11 @@ interface MountedNode {
 function needsRebuild(before: SceneNodeV2, after: SceneNodeV2): boolean {
   return (
     before.kind !== after.kind ||
+    (before.kind === 'primitive' && after.kind === 'primitive' && before.primitive !== after.primitive) ||
+    (before.kind === 'path' && after.kind === 'path' && before.path !== after.path) ||
+    (before.kind === 'area' && after.kind === 'area' && before.area !== after.area) ||
+    (before.kind === 'label' && after.kind === 'label' && before.label !== after.label) ||
+    (before.kind === 'light' && after.kind === 'light' && before.light !== after.light) ||
     (before.kind === 'model' && after.kind === 'model' && before.model.assetId !== after.model.assetId)
   )
 }
@@ -126,7 +139,7 @@ export class SceneSync {
     if (this.disposed) return
     this.disposed = true
     this.resources.dispose()
-    for (const { object } of this.mounted.values()) if (object instanceof PanelObject) object.dispose()
+    for (const entry of this.mounted.values()) this.disposeNode(entry)
     this.mounted.clear()
     this.attachedTo.clear()
     this.topLevel.clear()
@@ -148,7 +161,9 @@ export class SceneSync {
       if (current) return needsRebuild(current.node!, node)
       return !(node.kind === 'model' && this.failed.get(node.id) === node.model.assetId)
     })
-    const built = await Promise.all(toBuild.map(node => this.build(node, warnings)))
+    const models = await Promise.all(
+      toBuild.map(node => (node.kind === 'model' ? this.buildModel(node, warnings) : null)),
+    )
     this.assertActive()
 
     try {
@@ -159,7 +174,7 @@ export class SceneSync {
       }
       for (const id of this.failed.keys()) if (!nextIds.has(id)) this.failed.delete(id)
       toBuild.forEach((node, index) => {
-        const entry = built[index]
+        const entry = node.kind === 'model' ? models[index] : this.buildNode(node)
         if (entry) this.mounted.set(node.id, entry)
       })
 
@@ -232,10 +247,20 @@ export class SceneSync {
     }
   }
 
-  /** 为节点创建对象；模型加载失败时返回 null 并记一条警告，场景其余部分照常打开。 */
-  private async build(node: SceneNodeV2, warnings: string[]): Promise<MountedNode | null> {
+  private buildNode(node: Exclude<SceneNodeV2, { kind: 'model' }>): MountedNode {
     if (node.kind === 'group' || node.kind === 'panel-group') return { node: null, object: this.tag(new Group(), node) }
-    if (node.kind === 'panel') return { node: null, object: this.tag(new PanelObject(), node) }
+    if (node.kind === 'primitive') return { node: null, object: this.tag(createPrimitiveObject(node), node) }
+    if (node.kind === 'path') return { node: null, object: this.tag(createPathObject(node), node) }
+    if (node.kind === 'area') return { node: null, object: this.tag(createAreaObject(node), node) }
+    if (node.kind === 'label') return { node: null, object: this.tag(createLabelObject(node), node) }
+    if (node.kind === 'light') return { node: null, object: this.tag(createLightObject(node), node) }
+    return { node: null, object: this.tag(new PanelObject(), node) }
+  }
+
+  private async buildModel(
+    node: Extract<SceneNodeV2, { kind: 'model' }>,
+    warnings: string[],
+  ): Promise<MountedNode | null> {
     try {
       const asset = await this.assets.get(node.model.assetId)
       this.assertActive()
@@ -273,7 +298,12 @@ export class SceneSync {
     if (entry.node?.kind === 'group' || entry.node?.kind === 'panel-group') {
       for (const child of [...entry.object.children]) if (child.userData.sceneNodeId) child.removeFromParent()
     }
+    this.disposeNode(entry)
+  }
+
+  private disposeNode(entry: MountedNode): void {
     if (entry.object instanceof PanelObject) entry.object.dispose()
+    else if (entry.node && !['model', 'group', 'panel-group'].includes(entry.node.kind)) disposeOwned(entry.object)
   }
 
   private detach(object: Object3D): void {

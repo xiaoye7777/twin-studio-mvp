@@ -40,14 +40,15 @@ export const defaultPostSettings = (): PostSettings => ({
   saturation: 0.05,
 })
 
-export type OutlineChannel = 'selection' | 'hover'
+export type OutlineChannel = 'selection' | 'hover' | 'effect'
 
 /** Each outline channel masks its objects on its own camera layer. */
-const outlineLayers: Record<OutlineChannel, number> = { selection: 11, hover: 12 }
+const outlineLayers: Record<OutlineChannel, number> = { selection: 11, hover: 12, effect: 13 }
 
 const outlineColors: Record<OutlineChannel, number> = {
   selection: 0xf0a050,
   hover: 0x9ab0c8,
+  effect: 0xffd166,
 }
 
 /**
@@ -116,8 +117,9 @@ export class RenderPipeline {
   private rebuild(): void {
     const bloom = this.profile.bloom && this.post.bloom.enabled
     // Outline channels stay in the pass even when empty (an empty selection costs one texture read), so
-    // selecting and hovering never recompile shaders. The cheapest tier keeps only the selection outline.
-    const channels: OutlineChannel[] = this.profile.level === 'low' ? ['selection'] : ['selection', 'hover']
+    // selecting and hovering never recompile shaders. The cheapest tier skips hover outlines.
+    const channels: OutlineChannel[] =
+      this.profile.level === 'low' ? ['selection', 'effect'] : ['selection', 'effect', 'hover']
     const signature = JSON.stringify([
       bloom,
       this.profile.antialias,
@@ -160,6 +162,7 @@ export class RenderPipeline {
         blur: true,
         kernelSize: KernelSize.VERY_SMALL,
         xRay: channel === 'selection',
+        pulseSpeed: channel === 'effect' ? 0.6 : 0,
       })
       outline.selection.layer = outlineLayers[channel]
       outline.selection.set(this.outlined.get(channel) ?? [])

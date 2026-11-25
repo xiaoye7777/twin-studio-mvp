@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import { nodeKindLabels, useSession } from '@/studio/context'
 import { useShell } from '@/studio/shell'
 import NodeInteractions from './inspector/NodeInteractions.vue'
+import NodeEffects from './inspector/NodeEffects.vue'
 import NodeData from './inspector/NodeData.vue'
 import NodeProperties from './inspector/NodeProperties.vue'
 import PanelGroupInspector from './inspector/PanelGroupInspector.vue'
@@ -25,6 +26,7 @@ const title = computed(() => {
 const nodeTabs = [
   { id: 'properties', label: '属性' },
   { id: 'data', label: '数据' },
+  { id: 'effects', label: '特效' },
   { id: 'interactions', label: '交互' },
 ] as const
 const sceneTabs = [
@@ -75,6 +77,7 @@ const sceneTabs = [
       <template v-else-if="nodes.length">
         <NodeProperties v-if="shell.nodeTab === 'properties'" :nodes="nodes" />
         <NodeData v-else-if="shell.nodeTab === 'data'" :nodes="nodes" />
+        <NodeEffects v-else-if="shell.nodeTab === 'effects'" :nodes="nodes" />
         <NodeInteractions v-else :nodes="nodes" />
       </template>
       <SceneEnvironment v-else-if="shell.sceneTab === 'environment'" />
