@@ -3,6 +3,7 @@
  * 组合 / 取消组合、调整父子关系（保持世界坐标不变）。
  * 写给 Immer 草稿用（会原地修改），也可以用在普通的拷贝上。
  */
+import { createUuid } from '../domain/uuid'
 import { Euler, Matrix4, Quaternion, Vector3 } from 'three'
 import {
   canParent,
@@ -27,7 +28,7 @@ export function plain<T>(value: T): T {
 }
 
 export function newId(prefix: string): string {
-  return `${prefix}_${crypto.randomUUID()}`
+  return `${prefix}_${createUuid()}`
 }
 
 export function createEmptyDocument(projectId: string, name: string): Doc {

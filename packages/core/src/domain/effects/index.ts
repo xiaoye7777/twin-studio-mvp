@@ -1,3 +1,4 @@
+import { createUuid } from '../uuid'
 import { z } from 'zod'
 import { nonEmptyString } from '../schemaHelpers'
 import { TwinBindingTargetSchema, type TwinBindingTarget } from '../twin'
@@ -108,7 +109,7 @@ export function createEffect(kind: EffectKind, target: TwinBindingTarget): Effec
   if (kind === 'beam') Object.assign(parameters, { color: '#4fc3ff', opacity: 0.75, height: 30 })
   if (kind === 'radar') Object.assign(parameters, { color: '#42e6a4', opacity: 0.6, padding: 4 })
   if (kind === 'ripple') Object.assign(parameters, { color: '#ff7a45', opacity: 0.8, padding: 2 })
-  return { id: `effect_${crypto.randomUUID()}`, kind, target: { ...target }, parameters }
+  return { id: `effect_${createUuid()}`, kind, target: { ...target }, parameters }
 }
 export function createEffectParameters(): EffectParameters {
   return { color: '#ffb020', opacity: 0.65, speed: 1, padding: 0.2, text: '设备标注' }

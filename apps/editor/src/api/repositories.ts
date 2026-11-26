@@ -7,6 +7,7 @@ import {
   type AssetRecord,
   type AssetRepository,
   type AssetType,
+  createUuid,
   loadSceneDocument,
   type SceneDocument,
   type SceneRepository,
@@ -82,7 +83,7 @@ export class HttpSceneRepository implements SceneRepository {
 
   async save(document: SceneDocument): Promise<void> {
     const json = JSON.stringify(document)
-    const saveId = this.pending?.json === json ? this.pending.saveId : crypto.randomUUID()
+    const saveId = this.pending?.json === json ? this.pending.saveId : createUuid()
     this.pending = { saveId, json }
     try {
       const body = adapter.saveSceneBody({ baseRevision: this.revision, saveId, document })

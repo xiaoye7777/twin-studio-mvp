@@ -1,4 +1,5 @@
 /** Twin Studio 的共享运行时：编辑器直接使用，并打包进 @twin-studio/viewer。 */
+export { createUuid } from './domain/uuid'
 export * from './domain/scene'
 export * from './domain/twin'
 export * from './domain/dataSources'

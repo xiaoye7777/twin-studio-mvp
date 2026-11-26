@@ -1,3 +1,4 @@
+import { createUuid } from '../uuid'
 import { z } from 'zod'
 import {
   createEffect,
@@ -43,7 +44,7 @@ export type TemplateEffect = z.infer<typeof TemplateEffectSchema>
 export type EffectTemplate = z.infer<typeof EffectTemplateSchema>
 
 export function createTemplateEffect(kind: EffectKind): TemplateEffect {
-  return { id: crypto.randomUUID(), kind, parameters: createEffectParameters(), target: { mode: 'current-target' } }
+  return { id: createUuid(), kind, parameters: createEffectParameters(), target: { mode: 'current-target' } }
 }
 export function cloneTemplate(template: EffectTemplate): EffectTemplate {
   return {

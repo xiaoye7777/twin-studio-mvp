@@ -1,4 +1,4 @@
-import type { DeviceTemplate, TwinVariableDefinition } from '@twin-studio/core'
+import { createUuid, type DeviceTemplate, type TwinVariableDefinition } from '@twin-studio/core'
 
 export const defaultDeviceTemplates: readonly DeviceTemplate[] = [
   {
@@ -11,7 +11,7 @@ export const defaultDeviceTemplates: readonly DeviceTemplate[] = [
 ]
 
 export function deviceVariables(template: DeviceTemplate): TwinVariableDefinition[] {
-  return template.variables.map(variable => ({ ...variable, id: `var_${crypto.randomUUID()}` }))
+  return template.variables.map(variable => ({ ...variable, id: `var_${createUuid()}` }))
 }
 
 export function deviceIdFor(prefix: string, index: number): string {
