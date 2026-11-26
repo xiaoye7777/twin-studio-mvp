@@ -22,6 +22,11 @@ export function useStudioShortcuts(session: ShallowRef<EditorSession | null>, on
       if (key === 'escape' || key === 'p') run(() => s.exitPreview())
       return
     }
+    if (s.ui.tool === 'flow') {
+      if (key === 'escape') return run(() => s.setTool('select'))
+      if (key === 'enter') return run(() => s.flow.finish())
+      if (key === 'backspace' || key === 'delete' || (mod && key === 'z')) return run(() => s.flow.undoPoint())
+    }
     if (s.ui.placing && key === 'escape') return run(() => s.panels.stopPlacing())
     if (mod && key === 's') return run(onSave)
     if (mod && key === 'z') return run(() => (event.shiftKey ? s.redo() : s.undo()))

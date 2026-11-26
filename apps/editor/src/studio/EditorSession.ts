@@ -34,6 +34,7 @@ import { CameraViews } from './session/CameraViews'
 import { DeviceData } from './session/DeviceData'
 import { NodeEffects } from './session/NodeEffects'
 import { NodeEditing } from './session/NodeEditing'
+import { FlowLineDrawing } from './session/FlowLineDrawing'
 import { PanelManager } from './session/PanelManager'
 import { ViewportPointer } from './session/ViewportPointer'
 import { type GizmoMode, TransformGizmo } from './TransformGizmo'
@@ -41,7 +42,7 @@ import { type GizmoMode, TransformGizmo } from './TransformGizmo'
 export type SaveState = 'saved' | 'unsaved' | 'saving' | 'error'
 
 /** 视口左侧快捷栏的工具。select 只选中，不显示变换手柄。 */
-export type EditorTool = 'select' | GizmoMode
+export type EditorTool = 'select' | 'flow' | GizmoMode
 
 /** 场景仓库，加上选择「覆盖别人的修改」时要用的方法。 */
 export interface EditorSceneRepository extends SceneRepository {
@@ -84,6 +85,7 @@ export class EditorSession {
     warnings: [] as string[],
     mode: 'edit' as 'edit' | 'preview',
     tool: 'translate' as EditorTool,
+    flowPoints: 0,
     lockScaleRatio: true,
     canUndo: false,
     canRedo: false,
@@ -111,6 +113,7 @@ export class EditorSession {
   readonly cameras = new CameraViews(this)
   readonly devices = new DeviceData(this)
   readonly panels = new PanelManager(this)
+  readonly flow: FlowLineDrawing
   readonly pointer: ViewportPointer
   readonly projectId: string
   readonly assets: AssetRepository
@@ -159,6 +162,7 @@ export class EditorSession {
     this.gizmo.setMode('translate')
     this.panelLayer = new PanelLayer(this.engine, id => this.sync.objectFor(id), this.twin)
     this.store.subscribe(change => this.onDocumentChange(change))
+    this.flow = new FlowLineDrawing(this)
     this.pointer = new ViewportPointer(this)
   }
 
@@ -189,6 +193,7 @@ export class EditorSession {
     if (this.disposed) return
     this.disposed = true
     this.pointer.dispose()
+    this.flow.dispose()
     this.exitPreview()
     this.sceneEffects.dispose()
     this.panelLayer.dispose()
@@ -370,6 +375,7 @@ export class EditorSession {
 
   private async withCleanFrame(render: () => Promise<Blob | null>): Promise<Blob | null> {
     const helpers = this.doc.value.settings.helpers
+    this.flow.preview.visible = false
     this.engine.setHelpers({ grid: false, axes: false })
     this.gizmo.setVisible(false)
     this.engine.setOutlined('selection', [])
@@ -380,6 +386,7 @@ export class EditorSession {
       return await render()
     } finally {
       if (!this.disposed) {
+        this.flow.preview.visible = this.ui.tool === 'flow' && this.ui.mode === 'edit'
         if (this.ui.mode === 'edit') this.engine.setHelpers(helpers)
         this.refreshSelectionVisuals()
       }
@@ -420,15 +427,23 @@ export class EditorSession {
     this.panelLayer.setSelected(this.selection.value)
     const ids = topmost(this.doc.value, this.selection.value)
     // 选择工具和放置面板时不显示手柄：手柄会挡住点击。
-    const hideGizmo = this.ui.tool === 'select' || !!this.ui.placing
+    const hideGizmo = this.ui.tool === 'select' || this.ui.tool === 'flow' || !!this.ui.placing
     this.gizmoIds = hideGizmo ? [] : ids.filter(id => !isLockedOrHidden(this.doc.value, id).locked)
     this.gizmo.attach(this.gizmoIds.flatMap(id => this.sync.objectFor(id) ?? []))
     this.gizmo.setVisible(this.gizmoIds.length > 0)
   }
 
   setTool(tool: EditorTool): void {
+    if (this.ui.tool === 'flow') this.flow.reset()
     this.ui.tool = tool
-    if (tool !== 'select') this.gizmo.setMode(tool)
+    if (tool === 'flow') {
+      this.panels.stopPlacing()
+      this.pointer.closeContextMenu()
+      this.pointer.setHovered(null)
+      this.clearSelection()
+      this.flow.preview.visible = true
+      this.canvas.focus()
+    } else if (tool !== 'select') this.gizmo.setMode(tool)
     this.refreshSelectionVisuals()
   }
 
@@ -504,6 +519,7 @@ export class EditorSession {
   /** 预览：和 Viewer SDK 看到的一样，点击对象执行配置的交互，面板按模板的显示方式出现。 */
   enterPreview(): void {
     if (this.ui.mode === 'preview') return
+    if (this.ui.tool === 'flow') this.setTool('select')
     this.panels.stopPlacing()
     this.clearSelection()
     this.ui.contextMenu = null

@@ -179,6 +179,7 @@ export class PanelManager {
 
   /** 进入放置状态：之后在视口里单击一次放一个面板，直到按 Esc 或右键。 */
   startPlacing(groupId: string): void {
+    if (this.session.ui.tool === 'flow') this.session.setTool('select')
     this.session.ui.placing = groupId
     this.session.refreshSelectionVisuals()
   }

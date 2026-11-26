@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** 三维视口：画布、左侧编辑快捷栏、顶部固定视角、接收拖进来的模型、放置面板和预览的提示、右键菜单。 */
 import { ElMessage } from 'element-plus'
-import { Expand, MousePointer2, Move, Rotate3d, Scaling } from 'lucide-vue-next'
+import { Expand, MousePointer2, Move, Rotate3d, Scaling, Spline } from 'lucide-vue-next'
 import { computed, inject, ref } from 'vue'
 import { ASSET_DRAG_MIME, readAssetDrag } from '@/library/assetDrag'
 import { SessionKey } from '@/studio/context'
@@ -38,6 +38,7 @@ function onDrop(event: DragEvent): void {
   const payload = readAssetDrag(event.dataTransfer)
   if (!current?.ui.ready || payload?.type !== 'asset' || !editing.value) return
   try {
+    if (current.ui.tool === 'flow') current.setTool('select')
     current.nodes.addModel(
       payload.assetId,
       payload.name,
@@ -53,7 +54,7 @@ function onDrop(event: DragEvent): void {
 <template>
   <div
     class="viewport"
-    :class="{ 'is-dropping': dropping, 'is-placing': !!ui?.placing }"
+    :class="{ 'is-dropping': dropping, 'is-placing': !!ui?.placing || ui?.tool === 'flow' }"
     data-testid="viewport"
     @dragover="onDragOver"
     @dragleave="dropping = false"
@@ -74,6 +75,17 @@ function onDrop(event: DragEvent): void {
           @click="session.setTool(tool.id)"
         >
           <component :is="tool.icon" :size="15" />
+        </button>
+        <button
+          class="s-icon-btn"
+          :class="{ 'is-active': ui.tool === 'flow' }"
+          :aria-pressed="ui.tool === 'flow'"
+          title="绘制能流线"
+          aria-label="绘制能流线"
+          data-testid="tool-flow"
+          @click="session.setTool(ui.tool === 'flow' ? 'select' : 'flow')"
+        >
+          <Spline :size="15" />
         </button>
       </div>
 
@@ -106,6 +118,9 @@ function onDrop(event: DragEvent): void {
         <span class="s-dot" />预览模式 ·
         {{ ui.previewEventName ? `通知大屏：${ui.previewEventName}` : '点击对象查看数据' }} ·
         <span class="s-kbd">Esc</span> 退出
+      </div>
+      <div v-if="editing && ui.tool === 'flow'" class="viewport__hint s-float" role="status">
+        {{ ui.flowPoints ? '已取 ' + ui.flowPoints + ' 点' : '单击起点' }} · 单击加点 · 双击或回车完成 · Esc 取消
       </div>
       <div v-if="placingGroup" class="viewport__hint s-float" data-testid="placing-hint">
         往「{{ placingGroup.name }}」添加面板：在场景里单击放置 · <span class="s-kbd">Esc</span> 或右键结束

@@ -15,6 +15,7 @@ export class ViewportPointer {
     canvas.addEventListener('pointermove', this.onPointerMove)
     canvas.addEventListener('pointerleave', this.onPointerLeave)
     window.addEventListener('pointerup', this.onPointerUp)
+    canvas.addEventListener('dblclick', this.onDoubleClick)
     canvas.addEventListener('contextmenu', this.onContextMenu)
   }
 
@@ -25,6 +26,7 @@ export class ViewportPointer {
     canvas.removeEventListener('pointermove', this.onPointerMove)
     canvas.removeEventListener('pointerleave', this.onPointerLeave)
     window.removeEventListener('pointerup', this.onPointerUp)
+    canvas.removeEventListener('dblclick', this.onDoubleClick)
     canvas.removeEventListener('contextmenu', this.onContextMenu)
   }
 
@@ -42,6 +44,11 @@ export class ViewportPointer {
     if (!start || !this.editing) return
     if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 4) return
     if (event.target !== this.session.canvas) return
+    if (this.session.ui.tool === 'flow') {
+      if (start.button === 0) this.session.flow.addPoint(this.session.engine.pointAt(event.clientX, event.clientY))
+      if (start.button === 2) this.session.setTool('select')
+      return
+    }
     if (start.button === 2) return this.openContextMenu(event.clientX, event.clientY)
     if (start.button !== 0 || this.session.gizmo.active) return
     if (this.session.ui.placing) return void this.session.panels.placeAt(event.clientX, event.clientY)
@@ -72,17 +79,28 @@ export class ViewportPointer {
     if (this.session.ui.mode === 'edit') event.preventDefault()
   }
 
+  private readonly onDoubleClick = (): void => {
+    if (this.editing && this.session.ui.tool === 'flow') this.session.flow.finish()
+  }
+
   private readonly onPointerMove = (event: PointerEvent): void => {
     if (this.hoverFrame !== null) return
     const { clientX, clientY } = event
     this.hoverFrame = requestAnimationFrame(() => {
       this.hoverFrame = null
       if (this.session.disposed || !this.editing || this.pressed || this.session.gizmo.dragging) return
+      if (this.session.ui.tool === 'flow')
+        return this.session.flow.showCursor(this.session.engine.pointAt(clientX, clientY))
       this.setHovered(this.session.ui.placing ? null : this.pickNode(clientX, clientY))
     })
   }
 
-  private readonly onPointerLeave = (): void => this.setHovered(null)
+  private readonly onPointerLeave = (): void => {
+    if (this.hoverFrame !== null) cancelAnimationFrame(this.hoverFrame)
+    this.hoverFrame = null
+    if (this.session.ui.tool === 'flow') this.session.flow.showCursor(null)
+    this.setHovered(null)
+  }
 
   setHovered(id: string | null): void {
     if (this.session.hovered.value === id) return
