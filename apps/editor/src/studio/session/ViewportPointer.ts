@@ -7,6 +7,8 @@ import type { EditorSession } from '../EditorSession'
  */
 export class ViewportPointer {
   private pressed: { x: number; y: number; button: number } | null = null
+  private hoverX = 0
+  private hoverY = 0
   private hoverFrame: number | null = null
 
   constructor(private readonly session: EditorSession) {
@@ -84,14 +86,15 @@ export class ViewportPointer {
   }
 
   private readonly onPointerMove = (event: PointerEvent): void => {
+    this.hoverX = event.clientX
+    this.hoverY = event.clientY
     if (this.hoverFrame !== null) return
-    const { clientX, clientY } = event
     this.hoverFrame = requestAnimationFrame(() => {
       this.hoverFrame = null
       if (this.session.disposed || !this.editing || this.pressed || this.session.gizmo.dragging) return
       if (this.session.ui.tool === 'flow')
-        return this.session.flow.showCursor(this.session.engine.pointAt(clientX, clientY))
-      this.setHovered(this.session.ui.placing ? null : this.pickNode(clientX, clientY))
+        return this.session.flow.showCursor(this.session.engine.pointAt(this.hoverX, this.hoverY))
+      this.setHovered(this.session.ui.placing ? null : this.pickNode(this.hoverX, this.hoverY))
     })
   }
 
